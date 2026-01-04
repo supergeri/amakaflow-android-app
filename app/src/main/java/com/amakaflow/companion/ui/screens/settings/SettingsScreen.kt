@@ -23,11 +23,22 @@ import com.amakaflow.companion.ui.theme.AmakaSpacing
 
 @Composable
 fun SettingsScreen(
+    onNavigateToPairing: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showEnvironmentDialog by remember { mutableStateOf(false) }
     var showUnpairDialog by remember { mutableStateOf(false) }
+
+    // Navigate to pairing after unpair
+    LaunchedEffect(uiState.isPaired) {
+        if (!uiState.isPaired) {
+            // Delay navigation slightly to let dialog close
+            kotlinx.coroutines.delay(100)
+            // Only navigate if we were previously showing the unpair dialog
+            // This prevents auto-navigation on first load
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -63,7 +74,7 @@ fun SettingsScreen(
                     icon = Icons.Filled.QrCodeScanner,
                     title = "Pair Device",
                     subtitle = "Scan QR code to connect",
-                    onClick = { /* Navigate to pairing */ }
+                    onClick = onNavigateToPairing
                 )
             }
         }
@@ -201,6 +212,7 @@ fun SettingsScreen(
                     onClick = {
                         viewModel.unpair()
                         showUnpairDialog = false
+                        onNavigateToPairing()
                     }
                 ) {
                     Text(

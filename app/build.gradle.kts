@@ -106,6 +106,16 @@ dependencies {
     implementation(libs.camerax.view)
     implementation(libs.zxing.core)
 
+    // Room Database
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+
+    // WorkManager
+    implementation(libs.workmanager.runtime)
+    implementation(libs.workmanager.hilt)
+    ksp(libs.workmanager.hilt.compiler)
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

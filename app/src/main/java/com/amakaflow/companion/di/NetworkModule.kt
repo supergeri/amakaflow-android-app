@@ -1,7 +1,10 @@
 package com.amakaflow.companion.di
 
+import com.amakaflow.companion.BuildConfig
 import com.amakaflow.companion.data.AppEnvironment
 import com.amakaflow.companion.data.api.AmakaflowApi
+import com.amakaflow.companion.data.api.AuthAuthenticator
+import com.amakaflow.companion.data.api.AuthStateManager
 import com.amakaflow.companion.data.api.IngestorApi
 import com.amakaflow.companion.data.local.SecureStorage
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -17,6 +20,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import java.util.concurrent.TimeUnit
 import javax.inject.Named
+import javax.inject.Provider
 import javax.inject.Singleton
 
 @Module
@@ -34,27 +38,81 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideAuthInterceptor(secureStorage: SecureStorage): Interceptor {
-        return Interceptor { chain ->
-            val request = chain.request().newBuilder()
-            secureStorage.getToken()?.let { token ->
-                request.addHeader("Authorization", "Bearer $token")
-            }
-            request.addHeader("Content-Type", "application/json")
-            chain.proceed(request.build())
+    @Named("mapperBaseUrl")
+    fun provideMapperBaseUrl(): String = AppEnvironment.current.mapperApiUrl + "/"
+
+    @Provides
+    @Singleton
+    fun provideAuthStateManager(): AuthStateManager = object : AuthStateManager {
+        private var callback: (() -> Unit)? = null
+
+        override fun markNeedsReauth() {
+            callback?.invoke()
+        }
+
+        fun setCallback(onNeedsReauth: () -> Unit) {
+            callback = onNeedsReauth
         }
     }
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(authInterceptor: Interceptor): OkHttpClient {
+    fun provideAuthAuthenticator(
+        secureStorage: SecureStorage,
+        json: Json,
+        @Named("mapperBaseUrl") baseUrlProvider: Provider<String>,
+        authStateManager: AuthStateManager
+    ): AuthAuthenticator {
+        return AuthAuthenticator(secureStorage, json, baseUrlProvider, authStateManager)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAuthInterceptor(secureStorage: SecureStorage): Interceptor {
+        return Interceptor { chain ->
+            val request = chain.request().newBuilder()
+
+            // Add JWT token if available
+            secureStorage.getToken()?.let { token ->
+                request.addHeader("Authorization", "Bearer $token")
+            }
+
+            // Add E2E test headers if configured
+            if (BuildConfig.DEBUG) {
+                getTestAuthSecret()?.let { secret ->
+                    request.addHeader("X-Test-Auth", secret)
+                    getTestUserId()?.let { userId ->
+                        request.addHeader("X-Test-User-Id", userId)
+                    }
+                }
+            }
+
+            request.addHeader("Content-Type", "application/json")
+            chain.proceed(request.build())
+        }
+    }
+
+    private fun getTestAuthSecret(): String? = System.getenv("TEST_AUTH_SECRET")
+    private fun getTestUserId(): String? = System.getenv("TEST_USER_ID")
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(
+        authInterceptor: Interceptor,
+        authAuthenticator: AuthAuthenticator
+    ): OkHttpClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
         }
 
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
             .addInterceptor(loggingInterceptor)
+            .authenticator(authAuthenticator)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)

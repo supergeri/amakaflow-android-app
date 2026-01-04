@@ -14,9 +14,11 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -28,7 +30,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.amakaflow.companion.ui.screens.history.HistoryScreen
 import com.amakaflow.companion.ui.screens.home.HomeScreen
+import com.amakaflow.companion.ui.screens.pairing.PairingScreen
 import com.amakaflow.companion.ui.screens.settings.SettingsScreen
+import com.amakaflow.companion.ui.screens.settings.SettingsViewModel
 import com.amakaflow.companion.ui.screens.workouts.WorkoutDetailScreen
 import com.amakaflow.companion.ui.screens.workouts.WorkoutsScreen
 import com.amakaflow.companion.ui.theme.AmakaColors
@@ -101,67 +105,6 @@ val bottomNavItems = listOf(
 )
 
 @Composable
-fun AmakaFlowNavHost(
-    navController: NavHostController,
-    modifier: Modifier = Modifier
-) {
-    NavHost(
-        navController = navController,
-        startDestination = Screen.Home.route,
-        modifier = modifier
-    ) {
-        composable(Screen.Home.route) {
-            HomeScreen(
-                onNavigateToWorkouts = {
-                    navController.navigate(Screen.Workouts.route)
-                },
-                onNavigateToWorkoutDetail = { workoutId ->
-                    navController.navigate(Screen.WorkoutDetail.createRoute(workoutId))
-                }
-            )
-        }
-
-        composable(Screen.Workouts.route) {
-            WorkoutsScreen(
-                onNavigateToWorkoutDetail = { workoutId ->
-                    navController.navigate(Screen.WorkoutDetail.createRoute(workoutId))
-                }
-            )
-        }
-
-        composable(
-            route = Screen.WorkoutDetail.route,
-            arguments = listOf(navArgument("workoutId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val workoutId = backStackEntry.arguments?.getString("workoutId") ?: return@composable
-            WorkoutDetailScreen(
-                workoutId = workoutId,
-                onNavigateBack = { navController.popBackStack() },
-                onStartWorkout = { /* Navigate to workout player */ }
-            )
-        }
-
-        composable(Screen.Calendar.route) {
-            // Placeholder for calendar screen
-            HomeScreen(
-                onNavigateToWorkouts = {},
-                onNavigateToWorkoutDetail = {}
-            )
-        }
-
-        composable(Screen.History.route) {
-            HistoryScreen(
-                onNavigateToCompletionDetail = { /* Navigate to completion detail */ }
-            )
-        }
-
-        composable(Screen.Settings.route) {
-            SettingsScreen()
-        }
-    }
-}
-
-@Composable
 fun AmakaFlowBottomNavBar(
     navController: NavHostController
 ) {
@@ -208,16 +151,98 @@ fun AmakaFlowBottomNavBar(
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
+    val settingsViewModel: SettingsViewModel = hiltViewModel()
+    val settingsState by settingsViewModel.uiState.collectAsState()
+
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    // Show bottom bar only when paired and not on pairing screen
+    val showBottomBar = settingsState.isPaired && currentRoute != Screen.Pairing.route
+
+    // Start destination based on pairing state
+    val startDestination = if (settingsState.isPaired) Screen.Home.route else Screen.Pairing.route
 
     Scaffold(
         bottomBar = {
-            AmakaFlowBottomNavBar(navController = navController)
+            if (showBottomBar) {
+                AmakaFlowBottomNavBar(navController = navController)
+            }
         },
         containerColor = AmakaColors.background
     ) { innerPadding ->
-        AmakaFlowNavHost(
+        NavHost(
             navController = navController,
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding)
-        )
+        ) {
+            composable(Screen.Home.route) {
+                HomeScreen(
+                    onNavigateToWorkouts = {
+                        navController.navigate(Screen.Workouts.route)
+                    },
+                    onNavigateToWorkoutDetail = { workoutId ->
+                        navController.navigate(Screen.WorkoutDetail.createRoute(workoutId))
+                    }
+                )
+            }
+
+            composable(Screen.Workouts.route) {
+                WorkoutsScreen(
+                    onNavigateToWorkoutDetail = { workoutId ->
+                        navController.navigate(Screen.WorkoutDetail.createRoute(workoutId))
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.WorkoutDetail.route,
+                arguments = listOf(navArgument("workoutId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val workoutId = backStackEntry.arguments?.getString("workoutId") ?: return@composable
+                WorkoutDetailScreen(
+                    workoutId = workoutId,
+                    onNavigateBack = { navController.popBackStack() },
+                    onStartWorkout = { /* Navigate to workout player */ }
+                )
+            }
+
+            composable(Screen.Calendar.route) {
+                HomeScreen(
+                    onNavigateToWorkouts = {},
+                    onNavigateToWorkoutDetail = {}
+                )
+            }
+
+            composable(Screen.History.route) {
+                HistoryScreen(
+                    onNavigateToCompletionDetail = { /* Navigate to completion detail */ }
+                )
+            }
+
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onNavigateToPairing = {
+                        navController.navigate(Screen.Pairing.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                inclusive = true
+                            }
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.Pairing.route) {
+                PairingScreen(
+                    onPairingComplete = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Pairing.route) {
+                                inclusive = true
+                            }
+                        }
+                    }
+                )
+            }
+        }
     }
 }
