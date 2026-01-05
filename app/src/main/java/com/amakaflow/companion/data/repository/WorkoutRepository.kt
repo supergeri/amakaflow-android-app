@@ -42,6 +42,25 @@ class WorkoutRepository @Inject constructor(
         }
     }
 
+    fun getPushedWorkouts(): Flow<Result<List<Workout>>> = flow {
+        emit(Result.Loading)
+        try {
+            val response = api.getPushedWorkouts()
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                if (body.success) {
+                    emit(Result.Success(body.workouts))
+                } else {
+                    emit(Result.Error(body.message ?: "Failed to load pushed workouts", response.code()))
+                }
+            } else {
+                emit(Result.Error("Failed to load pushed workouts", response.code()))
+            }
+        } catch (e: Exception) {
+            emit(Result.Error(e.message ?: "Unknown error"))
+        }
+    }
+
     fun getWorkout(id: String): Flow<Result<Workout>> = flow {
         emit(Result.Loading)
         try {

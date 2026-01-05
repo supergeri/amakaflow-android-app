@@ -8,13 +8,15 @@ import com.amakaflow.companion.BuildConfig
 enum class AppEnvironment {
     PRODUCTION,
     STAGING,
-    DEVELOPMENT;
+    DEVELOPMENT,
+    LOCALHOST;
 
     val mapperApiUrl: String
         get() = when (this) {
             PRODUCTION -> BuildConfig.MAPPER_API_URL_PROD
             STAGING -> BuildConfig.MAPPER_API_URL_STAGING
             DEVELOPMENT -> BuildConfig.MAPPER_API_URL_DEV
+            LOCALHOST -> BuildConfig.MAPPER_API_URL_LOCALHOST
         }
 
     val ingestorApiUrl: String
@@ -22,6 +24,7 @@ enum class AppEnvironment {
             PRODUCTION -> BuildConfig.INGESTOR_API_URL_PROD
             STAGING -> BuildConfig.INGESTOR_API_URL_STAGING
             DEVELOPMENT -> BuildConfig.INGESTOR_API_URL_DEV
+            LOCALHOST -> BuildConfig.INGESTOR_API_URL_LOCALHOST
         }
 
     val displayName: String
@@ -29,6 +32,7 @@ enum class AppEnvironment {
             PRODUCTION -> "Production"
             STAGING -> "Staging"
             DEVELOPMENT -> "Development"
+            LOCALHOST -> "Localhost"
         }
 
     companion object {

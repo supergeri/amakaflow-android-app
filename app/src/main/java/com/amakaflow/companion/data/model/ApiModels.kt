@@ -302,3 +302,13 @@ data class CompletionDetailResponse(
     val success: Boolean,
     val completion: WorkoutCompletionDetail
 )
+
+/**
+ * Pushed workouts response wrapper
+ */
+@Serializable
+data class PushedWorkoutsResponse(
+    val success: Boolean,
+    val workouts: List<Workout> = emptyList(),
+    val message: String? = null
+)
