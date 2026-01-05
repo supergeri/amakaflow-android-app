@@ -9,9 +9,24 @@ import com.amakaflow.companion.data.repository.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
 private const val TAG = "PairingViewModel"
+
+/**
+ * JSON payload format for QR code pairing.
+ */
+@Serializable
+private data class QRCodePayload(
+    val type: String? = null,
+    val version: Int? = null,
+    val token: String? = null,
+    val api_url: String? = null
+)
+
+private val jsonParser = Json { ignoreUnknownKeys = true }
 
 enum class PairingMode {
     QR_CODE,
@@ -57,7 +72,8 @@ class PairingViewModel @Inject constructor(
 
         // Extract token from URL if QR contains amakaflow:// or https:// URL
         val token = extractTokenFromQRCode(code)
-        Log.d(TAG, "QR code scanned: $code -> extracted token: $token")
+        Log.d(TAG, "QR code scanned raw: '$code'")
+        Log.d(TAG, "QR code extracted token: '$token'")
         pair(token)
     }
 
@@ -65,31 +81,84 @@ class PairingViewModel @Inject constructor(
      * Extract pairing token from QR code content.
      *
      * Supports formats:
-     * - amakaflow://pair?token=xxx
-     * - https://app.amakaflow.com/pair?token=xxx
+     * - JSON payload: {"type":"amakaflow_pairing","version":1,"token":"xxx","api_url":"..."}
+     * - amakaflow://pair?token=xxx or amakaflow://pair?code=xxx
+     * - https://app.amakaflow.com/pair?token=xxx or ?code=xxx
+     * - https://app.amakaflow.com/pair/xxx (code in path)
      * - Raw token string
      * - 6-character short code
      */
     private fun extractTokenFromQRCode(qrValue: String): String {
         return try {
             when {
+                // Handle JSON payload format
+                qrValue.trimStart().startsWith("{") -> {
+                    extractTokenFromJson(qrValue) ?: qrValue
+                }
                 // Handle amakaflow:// deep links
                 qrValue.startsWith("amakaflow://") -> {
                     val uri = Uri.parse(qrValue)
-                    uri.getQueryParameter("token") ?: qrValue
+                    extractTokenFromUri(uri) ?: qrValue
                 }
                 // Handle https:// URLs
                 qrValue.startsWith("https://") || qrValue.startsWith("http://") -> {
                     val uri = Uri.parse(qrValue)
-                    uri.getQueryParameter("token") ?: qrValue
+                    extractTokenFromUri(uri) ?: qrValue
                 }
                 // Raw token or short code
                 else -> qrValue
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse QR code as URL, using raw value", e)
+            Log.w(TAG, "Failed to parse QR code, using raw value", e)
             qrValue
         }
+    }
+
+    /**
+     * Extract token from JSON payload.
+     */
+    private fun extractTokenFromJson(jsonString: String): String? {
+        return try {
+            val payload = jsonParser.decodeFromString<QRCodePayload>(jsonString)
+            if (payload.type == "amakaflow_pairing" && !payload.token.isNullOrEmpty()) {
+                Log.d(TAG, "Extracted token from JSON payload: ${payload.token.take(8)}...")
+                payload.token
+            } else {
+                Log.w(TAG, "JSON payload missing required fields: type=${payload.type}, hasToken=${payload.token != null}")
+                null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse JSON payload", e)
+            null
+        }
+    }
+
+    /**
+     * Extract token from a parsed URI.
+     * Checks query parameters (token, code) and path segments.
+     */
+    private fun extractTokenFromUri(uri: Uri): String? {
+        // Try common query parameter names
+        uri.getQueryParameter("token")?.let { return it }
+        uri.getQueryParameter("code")?.let { return it }
+
+        // Try to extract from path (e.g., /pair/ABC123)
+        val pathSegments = uri.pathSegments
+        if (pathSegments.size >= 2 && pathSegments[0] == "pair") {
+            val potentialCode = pathSegments[1]
+            // Validate it looks like a pairing code (alphanumeric, 6 chars)
+            if (potentialCode.length == 6 && potentialCode.all { it.isLetterOrDigit() }) {
+                return potentialCode
+            }
+        }
+
+        // Check last path segment as a fallback
+        val lastSegment = pathSegments.lastOrNull()
+        if (lastSegment != null && lastSegment.length == 6 && lastSegment.all { it.isLetterOrDigit() }) {
+            return lastSegment
+        }
+
+        return null
     }
 
     fun submitManualCode() {

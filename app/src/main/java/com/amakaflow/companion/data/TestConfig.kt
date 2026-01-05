@@ -3,6 +3,7 @@ package com.amakaflow.companion.data
 import android.content.Context
 import android.util.Log
 import androidx.core.content.edit
+import com.amakaflow.companion.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -59,13 +60,14 @@ class TestConfig @Inject constructor(
 
     var appEnvironment: AppEnvironment
         get() {
-            val name = prefs.getString(KEY_APP_ENVIRONMENT, AppEnvironment.PRODUCTION.name)
+            val defaultEnv = BuildConfig.DEFAULT_ENVIRONMENT
+            val name = prefs.getString(KEY_APP_ENVIRONMENT, defaultEnv)
             val env = try {
-                AppEnvironment.valueOf(name ?: AppEnvironment.PRODUCTION.name)
+                AppEnvironment.valueOf(name ?: defaultEnv)
             } catch (e: IllegalArgumentException) {
-                AppEnvironment.PRODUCTION
+                AppEnvironment.valueOf(defaultEnv)
             }
-            Log.d("TestConfig", "Getting appEnvironment: stored=$name, resolved=$env")
+            Log.d("TestConfig", "Getting appEnvironment: stored=$name, resolved=$env, default=$defaultEnv")
             return env
         }
         set(value) {

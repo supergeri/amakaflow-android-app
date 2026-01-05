@@ -22,11 +22,11 @@ android {
 
         // Build config fields for API endpoints
         buildConfigField("String", "MAPPER_API_URL_PROD", "\"https://mapper.amakaflow.com\"")
-        buildConfigField("String", "MAPPER_API_URL_STAGING", "\"https://mapper.staging.amakaflow.com\"")
+        buildConfigField("String", "MAPPER_API_URL_STAGING", "\"https://mapper-api.staging.amakaflow.com\"")
         buildConfigField("String", "MAPPER_API_URL_DEV", "\"http://10.0.2.2:8001\"")
         buildConfigField("String", "MAPPER_API_URL_LOCALHOST", "\"http://localhost:8001\"")
         buildConfigField("String", "INGESTOR_API_URL_PROD", "\"https://ingestor.amakaflow.com\"")
-        buildConfigField("String", "INGESTOR_API_URL_STAGING", "\"https://ingestor.staging.amakaflow.com\"")
+        buildConfigField("String", "INGESTOR_API_URL_STAGING", "\"https://ingestor-api.staging.amakaflow.com\"")
         buildConfigField("String", "INGESTOR_API_URL_DEV", "\"http://10.0.2.2:8002\"")
         buildConfigField("String", "INGESTOR_API_URL_LOCALHOST", "\"http://localhost:8002\"")
     }
@@ -38,9 +38,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField("String", "DEFAULT_ENVIRONMENT", "\"PRODUCTION\"")
         }
         debug {
             isMinifyEnabled = false
+            buildConfigField("String", "DEFAULT_ENVIRONMENT", "\"STAGING\"")
         }
     }
 
