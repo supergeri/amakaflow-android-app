@@ -15,6 +15,14 @@ sealed class Result<out T> {
     data object Loading : Result<Nothing>()
 }
 
+/**
+ * Paginated completions result with total count for pagination
+ */
+data class CompletionsResult(
+    val completions: List<WorkoutCompletion>,
+    val total: Int
+)
+
 @Singleton
 class WorkoutRepository @Inject constructor(
     private val api: AmakaflowApi
@@ -47,12 +55,16 @@ class WorkoutRepository @Inject constructor(
         }
     }
 
-    fun getCompletions(limit: Int = 50, offset: Int = 0): Flow<Result<List<WorkoutCompletion>>> = flow {
+    fun getCompletions(limit: Int = 50, offset: Int = 0): Flow<Result<CompletionsResult>> = flow {
         emit(Result.Loading)
         try {
             val response = api.getCompletions(limit, offset)
-            if (response.isSuccessful) {
-                emit(Result.Success(response.body() ?: emptyList()))
+            if (response.isSuccessful && response.body()?.success == true) {
+                val body = response.body()!!
+                emit(Result.Success(CompletionsResult(
+                    completions = body.completions,
+                    total = body.total
+                )))
             } else {
                 emit(Result.Error("Failed to load completions", response.code()))
             }
@@ -65,8 +77,8 @@ class WorkoutRepository @Inject constructor(
         emit(Result.Loading)
         try {
             val response = api.getCompletionDetail(id)
-            if (response.isSuccessful && response.body() != null) {
-                emit(Result.Success(response.body()!!))
+            if (response.isSuccessful && response.body()?.success == true) {
+                emit(Result.Success(response.body()!!.completion))
             } else {
                 emit(Result.Error("Failed to load completion detail", response.code()))
             }

@@ -1,6 +1,7 @@
 package com.amakaflow.companion.data
 
 import android.content.Context
+import android.util.Log
 import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -21,6 +22,7 @@ class TestConfig @Inject constructor(
         private const val KEY_TEST_AUTH_SECRET = "test_auth_secret"
         private const val KEY_TEST_USER_ID = "test_user_id"
         private const val KEY_TEST_USER_EMAIL = "test_user_email"
+        private const val KEY_APP_ENVIRONMENT = "app_environment"
 
         // Default test credentials for e2e testing
         const val DEFAULT_TEST_USER_EMAIL = "soopergeri+e2etest@gmail.com"
@@ -53,5 +55,29 @@ class TestConfig @Inject constructor(
         isTestModeEnabled = false
         testAuthSecret = null
         testUserId = null
+    }
+
+    var appEnvironment: AppEnvironment
+        get() {
+            val name = prefs.getString(KEY_APP_ENVIRONMENT, AppEnvironment.PRODUCTION.name)
+            val env = try {
+                AppEnvironment.valueOf(name ?: AppEnvironment.PRODUCTION.name)
+            } catch (e: IllegalArgumentException) {
+                AppEnvironment.PRODUCTION
+            }
+            Log.d("TestConfig", "Getting appEnvironment: stored=$name, resolved=$env")
+            return env
+        }
+        set(value) {
+            Log.d("TestConfig", "Setting appEnvironment: $value")
+            prefs.edit { putString(KEY_APP_ENVIRONMENT, value.name) }
+            AppEnvironment.current = value
+        }
+
+    init {
+        // Initialize AppEnvironment.current from persisted value on startup
+        val storedEnv = appEnvironment
+        Log.d("TestConfig", "Init: Loading stored environment=$storedEnv, setting AppEnvironment.current")
+        AppEnvironment.current = storedEnv
     }
 }

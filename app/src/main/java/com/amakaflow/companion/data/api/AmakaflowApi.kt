@@ -54,13 +54,13 @@ interface AmakaflowApi {
     suspend fun getCompletions(
         @Query("limit") limit: Int = 50,
         @Query("offset") offset: Int = 0
-    ): Response<List<WorkoutCompletion>>
+    ): Response<CompletionsResponse>
 
     /**
      * Get detailed workout completion by ID
      */
     @GET("workouts/completions/{id}")
-    suspend fun getCompletionDetail(@Path("id") id: String): Response<WorkoutCompletionDetail>
+    suspend fun getCompletionDetail(@Path("id") id: String): Response<CompletionDetailResponse>
 
     /**
      * Submit a completed workout

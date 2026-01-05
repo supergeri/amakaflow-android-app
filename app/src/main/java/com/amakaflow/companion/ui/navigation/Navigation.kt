@@ -30,6 +30,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.amakaflow.companion.data.TestConfig
 import com.amakaflow.companion.ui.screens.calendar.CalendarScreen
+import com.amakaflow.companion.ui.screens.completion.CompletionDetailScreen
 import com.amakaflow.companion.ui.screens.debug.ErrorLogScreen
 import com.amakaflow.companion.ui.screens.debug.WorkoutDebugScreen
 import com.amakaflow.companion.ui.screens.history.HistoryScreen
@@ -66,6 +67,9 @@ sealed class Screen(val route: String) {
     data object ErrorLog : Screen("error_log")
     data object TranscriptionSettings : Screen("transcription_settings")
     data object VoiceWorkout : Screen("voice_workout")
+    data object CompletionDetail : Screen("completion/{completionId}") {
+        fun createRoute(completionId: String) = "completion/$completionId"
+    }
 }
 
 /**
@@ -228,7 +232,9 @@ fun MainScreen(testConfig: TestConfig) {
             composable(Screen.Sources.route) {
                 // Sources screen - placeholder for now, shows History as similar content
                 HistoryScreen(
-                    onNavigateToCompletionDetail = { /* Navigate to completion detail */ }
+                    onNavigateToCompletionDetail = { completionId ->
+                        navController.navigate(Screen.CompletionDetail.createRoute(completionId))
+                    }
                 )
             }
 
@@ -254,7 +260,9 @@ fun MainScreen(testConfig: TestConfig) {
             composable(Screen.History.route) {
                 HistoryScreen(
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToCompletionDetail = { /* Navigate to completion detail */ }
+                    onNavigateToCompletionDetail = { completionId ->
+                        navController.navigate(Screen.CompletionDetail.createRoute(completionId))
+                    }
                 )
             }
 
@@ -300,6 +308,17 @@ fun MainScreen(testConfig: TestConfig) {
             composable(Screen.VoiceWorkout.route) {
                 VoiceWorkoutScreen(
                     onDismiss = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route = Screen.CompletionDetail.route,
+                arguments = listOf(navArgument("completionId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val completionId = backStackEntry.arguments?.getString("completionId") ?: return@composable
+                CompletionDetailScreen(
+                    completionId = completionId,
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
 

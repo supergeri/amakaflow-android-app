@@ -45,16 +45,33 @@ enum class CompletionSource {
 @Serializable
 data class WorkoutCompletion(
     val id: String,
+    @SerialName("workout_name")
     val workoutName: String,
+    @SerialName("started_at")
     val startedAt: Instant,
+    @SerialName("ended_at")
     val endedAt: Instant? = null,
+    @SerialName("duration_seconds")
     val durationSeconds: Int,
+    @SerialName("avg_heart_rate")
     val avgHeartRate: Int? = null,
+    @SerialName("max_heart_rate")
     val maxHeartRate: Int? = null,
+    @SerialName("min_heart_rate")
+    val minHeartRate: Int? = null,
+    @SerialName("active_calories")
     val activeCalories: Int? = null,
+    @SerialName("total_calories")
+    val totalCalories: Int? = null,
+    @SerialName("distance_meters")
+    val distanceMeters: Int? = null,
+    val steps: Int? = null,
     val source: CompletionSource,
+    @SerialName("synced_to_strava")
     val syncedToStrava: Boolean? = null,
+    @SerialName("workout_id")
     val workoutId: String? = null,
+    @SerialName("original_workout")
     val originalWorkout: Workout? = null
 ) {
     val resolvedEndedAt: Instant

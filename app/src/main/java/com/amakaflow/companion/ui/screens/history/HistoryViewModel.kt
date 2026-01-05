@@ -13,7 +13,10 @@ import javax.inject.Inject
 
 data class HistoryUiState(
     val isLoading: Boolean = true,
+    val isLoadingMore: Boolean = false,
+    val isRefreshing: Boolean = false,
     val completions: List<WorkoutCompletion> = emptyList(),
+    val total: Int = 0,
     val error: String? = null
 ) {
     val groupedCompletions: List<Pair<DateCategory, List<WorkoutCompletion>>>
@@ -21,6 +24,12 @@ data class HistoryUiState(
             .groupBy { it.dateCategory }
             .toList()
             .sortedBy { (category, _) -> category.sortOrder }
+
+    val hasMore: Boolean
+        get() = completions.size < total
+
+    val canLoadMore: Boolean
+        get() = hasMore && !isLoading && !isLoadingMore
 }
 
 @HiltViewModel
@@ -31,13 +40,17 @@ class HistoryViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
 
+    companion object {
+        private const val PAGE_SIZE = 50
+    }
+
     init {
         loadCompletions()
     }
 
     private fun loadCompletions() {
         viewModelScope.launch {
-            workoutRepository.getCompletions().collect { result ->
+            workoutRepository.getCompletions(limit = PAGE_SIZE, offset = 0).collect { result ->
                 when (result) {
                     is Result.Loading -> {
                         _uiState.update { it.copy(isLoading = true, error = null) }
@@ -46,7 +59,9 @@ class HistoryViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
-                                completions = result.data,
+                                isRefreshing = false,
+                                completions = result.data.completions,
+                                total = result.data.total,
                                 error = null
                             )
                         }
@@ -55,6 +70,43 @@ class HistoryViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
+                                isRefreshing = false,
+                                error = result.message
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun loadMore() {
+        val currentState = _uiState.value
+        if (!currentState.canLoadMore) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMore = true) }
+
+            val offset = currentState.completions.size
+            workoutRepository.getCompletions(limit = PAGE_SIZE, offset = offset).collect { result ->
+                when (result) {
+                    is Result.Loading -> {
+                        // Already set isLoadingMore above
+                    }
+                    is Result.Success -> {
+                        _uiState.update {
+                            it.copy(
+                                isLoadingMore = false,
+                                completions = it.completions + result.data.completions,
+                                total = result.data.total,
+                                error = null
+                            )
+                        }
+                    }
+                    is Result.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isLoadingMore = false,
                                 error = result.message
                             )
                         }
@@ -65,6 +117,7 @@ class HistoryViewModel @Inject constructor(
     }
 
     fun refresh() {
+        _uiState.update { it.copy(isRefreshing = true) }
         loadCompletions()
     }
 }
