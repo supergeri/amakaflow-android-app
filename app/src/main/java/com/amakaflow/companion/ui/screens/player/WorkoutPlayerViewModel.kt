@@ -180,10 +180,10 @@ class WorkoutPlayerViewModel @Inject constructor(
         val currentState = _uiState.value
         val step = currentState.currentStep ?: return
 
-        // Check if current step has rest after it
-        val restSeconds = step.restSeconds
-        if (restSeconds != null && restSeconds > 0 && currentState.phase != WorkoutPhase.RESTING) {
-            enterRestPhase(restSeconds)
+        // Check if current step has rest after it (matches iOS behavior)
+        if (step.hasRestAfter && currentState.phase != WorkoutPhase.RESTING) {
+            // restAfterSeconds: null = manual rest, >0 = timed countdown
+            enterRestPhase(step.restAfterSeconds)
             return
         }
 
@@ -403,8 +403,16 @@ class WorkoutPlayerViewModel @Inject constructor(
                     workoutName = workoutName ?: "Workout",
                     startedAt = startedAt,
                     endedAt = Clock.System.now(),
-                    durationSeconds = durationSeconds,
                     source = CompletionSource.PHONE,
+                    healthMetrics = HealthMetrics(
+                        avgHeartRate = null,
+                        maxHeartRate = null,
+                        minHeartRate = null,
+                        activeCalories = null,
+                        totalCalories = null,
+                        distanceMeters = null,
+                        steps = null
+                    ),
                     workoutStructure = intervals?.map { it.toSubmissionInterval() }
                 )
                 val result = workoutRepository.completeWorkout(submission)

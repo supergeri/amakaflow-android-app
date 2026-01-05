@@ -104,11 +104,14 @@ enum class RemoteCommand {
 
 /**
  * Flattened interval for workout execution
+ * Matches iOS FlattenedInterval structure for consistent behavior
  */
 data class FlattenedInterval(
     val index: Int,
     val interval: WorkoutInterval,
-    val roundInfo: String? = null
+    val roundInfo: String? = null,
+    val hasRestAfter: Boolean = false,
+    val restAfterSeconds: Int? = null // null = manual rest ("tap when ready"), 0 = no rest, >0 = timed countdown
 ) {
     val stepType: StepType
         get() = when (interval) {
@@ -153,20 +156,29 @@ data class FlattenedInterval(
 
 /**
  * Utility to flatten workout intervals
+ * Matches iOS IntervalFlattener behavior for consistent rest handling
  */
 object IntervalFlattener {
     fun flatten(intervals: List<WorkoutInterval>): List<FlattenedInterval> {
         val result = mutableListOf<FlattenedInterval>()
-        flattenRecursive(intervals, result, null)
-        return result.mapIndexed { index, item -> item.copy(index = index) }
+        flattenRecursive(intervals, result, null, isInsideRepeat = false)
+        return result.mapIndexed { index, item ->
+            // Set hasRestAfter for all steps except cooldown
+            val isCooldown = item.interval is WorkoutInterval.Cooldown
+            item.copy(
+                index = index,
+                hasRestAfter = !isCooldown
+            )
+        }
     }
 
     private fun flattenRecursive(
         intervals: List<WorkoutInterval>,
         result: MutableList<FlattenedInterval>,
-        roundPrefix: String?
+        roundPrefix: String?,
+        isInsideRepeat: Boolean
     ) {
-        for (interval in intervals) {
+        for ((i, interval) in intervals.withIndex()) {
             when (interval) {
                 is WorkoutInterval.Repeat -> {
                     for (rep in 1..interval.reps) {
@@ -175,14 +187,53 @@ object IntervalFlattener {
                         } else {
                             "Round $rep/${interval.reps}"
                         }
-                        flattenRecursive(interval.intervals, result, newPrefix)
+                        flattenRecursive(interval.intervals, result, newPrefix, isInsideRepeat = true)
                     }
+                }
+                is WorkoutInterval.Time -> {
+                    // Skip Time intervals inside Repeat blocks - they represent rest periods
+                    // for the previous exercise, not separate exercise steps
+                    if (isInsideRepeat) {
+                        // Apply this time as rest to the previous step if it exists
+                        if (result.isNotEmpty()) {
+                            val lastStep = result.last()
+                            result[result.size - 1] = lastStep.copy(
+                                restAfterSeconds = interval.seconds
+                            )
+                        }
+                    } else {
+                        // Top-level Time intervals are standalone timed exercises
+                        result.add(FlattenedInterval(
+                            index = 0,
+                            interval = interval,
+                            roundInfo = roundPrefix,
+                            restAfterSeconds = null // Manual rest after standalone timed intervals
+                        ))
+                    }
+                }
+                is WorkoutInterval.Reps -> {
+                    // Check if next interval is a Time (rest period)
+                    val nextInterval = intervals.getOrNull(i + 1)
+                    val restSeconds = when {
+                        // If reps has explicit restSec, use that
+                        interval.restSec != null && interval.restSec > 0 -> interval.restSec
+                        // If next interval is Time inside a repeat, it will be handled when we process it
+                        // For now, default to manual rest (null)
+                        else -> null
+                    }
+                    result.add(FlattenedInterval(
+                        index = 0,
+                        interval = interval,
+                        roundInfo = roundPrefix,
+                        restAfterSeconds = restSeconds
+                    ))
                 }
                 else -> {
                     result.add(FlattenedInterval(
-                        index = 0, // Will be updated after
+                        index = 0,
                         interval = interval,
-                        roundInfo = roundPrefix
+                        roundInfo = roundPrefix,
+                        restAfterSeconds = null // Manual rest by default
                     ))
                 }
             }

@@ -30,16 +30,10 @@ import com.amakaflow.companion.ui.theme.AmakaSpacing
 fun WorkoutPlayerScreen(
     workoutId: String,
     onDismiss: () -> Unit,
+    onRunAgain: (String) -> Unit = {},
     viewModel: WorkoutPlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-
-    // Handle workout completion
-    LaunchedEffect(uiState.phase) {
-        if (uiState.phase == WorkoutPhase.ENDED) {
-            onDismiss()
-        }
-    }
 
     Box(
         modifier = Modifier
@@ -53,6 +47,25 @@ fun WorkoutPlayerScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(color = AmakaColors.accentBlue)
+                }
+            }
+            // Show completion screen when workout ends
+            uiState.phase == WorkoutPhase.ENDED && uiState.workoutCompleted -> {
+                WorkoutCompletionScreen(
+                    workoutName = uiState.workout?.name ?: "Workout",
+                    durationSeconds = uiState.elapsedSeconds,
+                    onDone = onDismiss,
+                    onRunAgain = {
+                        uiState.workout?.id?.let { id ->
+                            onRunAgain(id)
+                        } ?: onDismiss()
+                    }
+                )
+            }
+            // Dismiss immediately if discarded
+            uiState.phase == WorkoutPhase.ENDED && !uiState.workoutCompleted -> {
+                LaunchedEffect(Unit) {
+                    onDismiss()
                 }
             }
             uiState.error != null -> {

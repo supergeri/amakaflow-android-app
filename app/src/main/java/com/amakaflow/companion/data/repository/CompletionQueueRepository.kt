@@ -50,18 +50,23 @@ class CompletionQueueRepository @Inject constructor(
      * Queue a completion for later sync
      */
     suspend fun queueCompletion(submission: WorkoutCompletionSubmission) {
+        // Calculate duration from startedAt and endedAt
+        val durationSeconds = submission.endedAt?.let { ended ->
+            ((ended.toEpochMilliseconds() - submission.startedAt.toEpochMilliseconds()) / 1000).toInt()
+        } ?: 0
+
         val entity = PendingCompletionEntity(
             workoutId = submission.workoutId,
             workoutName = submission.workoutName,
             startedAt = submission.startedAt.toString(),
             endedAt = submission.endedAt?.toString(),
-            durationSeconds = submission.durationSeconds,
+            durationSeconds = durationSeconds,
             source = submission.source.name.lowercase(),
-            avgHeartRate = submission.avgHeartRate,
-            maxHeartRate = submission.maxHeartRate,
-            minHeartRate = submission.minHeartRate,
-            activeCalories = submission.activeCalories,
-            totalCalories = submission.totalCalories,
+            avgHeartRate = submission.healthMetrics.avgHeartRate,
+            maxHeartRate = submission.healthMetrics.maxHeartRate,
+            minHeartRate = submission.healthMetrics.minHeartRate,
+            activeCalories = submission.healthMetrics.activeCalories,
+            totalCalories = submission.healthMetrics.totalCalories,
             deviceInfoJson = submission.deviceInfo?.let { json.encodeToString(it) },
             workoutStructureJson = submission.workoutStructure?.let { json.encodeToString(it) }
         )

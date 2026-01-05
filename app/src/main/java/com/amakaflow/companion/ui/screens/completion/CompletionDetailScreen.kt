@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.amakaflow.companion.data.model.CompletionSource
 import com.amakaflow.companion.data.model.WorkoutCompletionDetail
-import com.amakaflow.companion.data.model.WorkoutInterval
+import com.amakaflow.companion.data.model.WorkoutIntervalSubmission
 import com.amakaflow.companion.ui.theme.AmakaColors
 import com.amakaflow.companion.ui.theme.AmakaCornerRadius
 import com.amakaflow.companion.ui.theme.AmakaSpacing
@@ -470,59 +470,46 @@ private fun CompletionDetailContent(
 
 /**
  * Flattens nested workout intervals into a simple list for display
+ * WorkoutIntervalSubmission with type="repeat" contains reps count but not nested intervals,
+ * so we just filter out repeat types as they're metadata only
  */
-private fun flattenWorkoutIntervals(intervals: List<WorkoutInterval>): List<WorkoutInterval> {
-    val result = mutableListOf<WorkoutInterval>()
-    for (interval in intervals) {
-        when (interval) {
-            is WorkoutInterval.Repeat -> {
-                // Expand repeat blocks
-                repeat(interval.reps) {
-                    result.addAll(flattenWorkoutIntervals(interval.intervals))
-                }
-            }
-            else -> result.add(interval)
-        }
-    }
-    return result
+private fun flattenWorkoutIntervals(intervals: List<WorkoutIntervalSubmission>): List<WorkoutIntervalSubmission> {
+    return intervals.filter { it.type != "repeat" }
 }
 
 /**
  * Display a single workout step row
  */
 @Composable
-private fun WorkoutStepRow(stepNumber: Int, step: WorkoutInterval) {
-    val (name, detail, target, iconColor) = when (step) {
-        is WorkoutInterval.Warmup -> {
-            Tuple4("Warm Up", formatTime(step.seconds), step.target, AmakaColors.accentOrange)
+private fun WorkoutStepRow(stepNumber: Int, step: WorkoutIntervalSubmission) {
+    val (name, detail, target, iconColor) = when (step.type.lowercase()) {
+        "warmup" -> {
+            Tuple4("Warm Up", step.seconds?.let { formatTime(it) } ?: "", step.target, AmakaColors.accentOrange)
         }
-        is WorkoutInterval.Cooldown -> {
-            Tuple4("Cool Down", formatTime(step.seconds), step.target, AmakaColors.accentBlue)
+        "cooldown" -> {
+            Tuple4("Cool Down", step.seconds?.let { formatTime(it) } ?: "", step.target, AmakaColors.accentBlue)
         }
-        is WorkoutInterval.Time -> {
-            Tuple4("Timed Interval", formatTime(step.seconds), step.target, AmakaColors.accentGreen)
+        "time" -> {
+            Tuple4("Timed Interval", step.seconds?.let { formatTime(it) } ?: "", step.target, AmakaColors.accentGreen)
         }
-        is WorkoutInterval.Reps -> {
-            var detailStr = "${step.reps} reps"
+        "reps" -> {
+            var detailStr = "${step.reps ?: 0} reps"
             if (step.sets != null && step.sets > 1) {
-                detailStr = "${step.sets} × ${step.reps} reps"
+                detailStr = "${step.sets} × ${step.reps ?: 0} reps"
             }
-            if (step.load != null && step.load.isNotEmpty()) {
-                detailStr += " @ ${step.load}"
-            }
-            Tuple4(step.name, detailStr, null, AmakaColors.accentPurple)
+            Tuple4(step.name ?: "Exercise", detailStr, null, AmakaColors.accentPurple)
         }
-        is WorkoutInterval.Distance -> {
-            val distStr = if (step.meters >= 1000) {
-                String.format("%.1f km", step.meters / 1000.0)
+        "distance" -> {
+            val meters = step.seconds ?: 0 // distance stored in seconds field as meters
+            val distStr = if (meters >= 1000) {
+                String.format("%.1f km", meters / 1000.0)
             } else {
-                "${step.meters}m"
+                "${meters}m"
             }
             Tuple4("Distance", distStr, step.target, AmakaColors.accentGreen)
         }
-        is WorkoutInterval.Repeat -> {
-            // This shouldn't happen after flattening, but handle it anyway
-            Tuple4("Repeat ${step.reps}x", "${step.intervals.size} exercises", null, AmakaColors.textSecondary)
+        else -> {
+            Tuple4(step.type.replaceFirstChar { it.uppercase() }, "", step.target, AmakaColors.textSecondary)
         }
     }
 

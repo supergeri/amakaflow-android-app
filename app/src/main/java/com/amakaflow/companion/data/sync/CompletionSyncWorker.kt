@@ -164,12 +164,16 @@ class CompletionSyncWorker @AssistedInject constructor(
             workoutName = entity.workoutName,
             startedAt = Instant.parse(entity.startedAt),
             endedAt = entity.endedAt?.let { Instant.parse(it) },
-            durationSeconds = entity.durationSeconds,
             source = CompletionSource.valueOf(entity.source.uppercase()),
-            avgHeartRate = entity.avgHeartRate,
-            maxHeartRate = entity.maxHeartRate,
-            minHeartRate = entity.minHeartRate,
-            activeCalories = entity.activeCalories,
+            healthMetrics = HealthMetrics(
+                avgHeartRate = entity.avgHeartRate,
+                maxHeartRate = entity.maxHeartRate,
+                minHeartRate = entity.minHeartRate,
+                activeCalories = entity.activeCalories,
+                totalCalories = null,
+                distanceMeters = null,
+                steps = null
+            ),
             deviceInfo = deviceInfo,
             workoutStructure = structure
         )
