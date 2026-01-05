@@ -28,12 +28,32 @@ data class CompletionsResult(
 class WorkoutRepository @Inject constructor(
     private val api: AmakaflowApi
 ) {
+    // In-memory cache of workouts for quick lookup
+    private val workoutCache = mutableMapOf<String, Workout>()
+
+    /**
+     * Cache workouts for later lookup by ID
+     */
+    private fun cacheWorkouts(workouts: List<Workout>) {
+        workouts.forEach { workout ->
+            workoutCache[workout.id] = workout
+        }
+    }
+
+    /**
+     * Get a cached workout by ID, or null if not found
+     */
+    fun getCachedWorkout(id: String): Workout? = workoutCache[id]
+
     fun getIncomingWorkouts(): Flow<Result<List<Workout>>> = flow {
         emit(Result.Loading)
         try {
             val response = api.getIncomingWorkouts()
             if (response.isSuccessful) {
-                emit(Result.Success(response.body() ?: emptyList()))
+                val workouts = response.body() ?: emptyList()
+                // Cache workouts for later lookup by ID
+                cacheWorkouts(workouts)
+                emit(Result.Success(workouts))
             } else {
                 emit(Result.Error("Failed to load workouts", response.code()))
             }
@@ -49,6 +69,8 @@ class WorkoutRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 val body = response.body()!!
                 if (body.success) {
+                    // Cache workouts for later lookup by ID
+                    cacheWorkouts(body.workouts)
                     emit(Result.Success(body.workouts))
                 } else {
                     emit(Result.Error(body.message ?: "Failed to load pushed workouts", response.code()))
@@ -62,11 +84,26 @@ class WorkoutRepository @Inject constructor(
     }
 
     fun getWorkout(id: String): Flow<Result<Workout>> = flow {
+        // First check the cache for the workout
+        val cachedWorkout = workoutCache[id]
+        if (cachedWorkout != null) {
+            emit(Result.Success(cachedWorkout))
+            return@flow
+        }
+
+        // Workout not in cache, try fetching from API
         emit(Result.Loading)
         try {
             val response = api.getWorkout(id)
             if (response.isSuccessful && response.body() != null) {
-                emit(Result.Success(response.body()!!))
+                val body = response.body()!!
+                if (body.success && body.workout != null) {
+                    // Cache the fetched workout
+                    workoutCache[id] = body.workout
+                    emit(Result.Success(body.workout))
+                } else {
+                    emit(Result.Error(body.message ?: "Workout not found", response.code()))
+                }
             } else {
                 emit(Result.Error("Failed to load workout", response.code()))
             }

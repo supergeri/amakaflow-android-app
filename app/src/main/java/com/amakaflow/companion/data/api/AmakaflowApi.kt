@@ -44,7 +44,7 @@ interface AmakaflowApi {
      * Get a specific workout by ID
      */
     @GET("workouts/{id}")
-    suspend fun getWorkout(@Path("id") id: String): Response<Workout>
+    suspend fun getWorkout(@Path("id") id: String): Response<WorkoutResponse>
 
     // MARK: - Workout Completions (History)
 

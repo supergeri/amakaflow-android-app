@@ -312,3 +312,13 @@ data class PushedWorkoutsResponse(
     val workouts: List<Workout> = emptyList(),
     val message: String? = null
 )
+
+/**
+ * Single workout response wrapper
+ */
+@Serializable
+data class WorkoutResponse(
+    val success: Boolean,
+    val workout: Workout? = null,
+    val message: String? = null
+)

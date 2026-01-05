@@ -4,20 +4,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,6 +33,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigateToWorkouts: () -> Unit,
@@ -40,6 +43,24 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val today = LocalDate.now()
+    var showQuickStartSheet by remember { mutableStateOf(false) }
+
+    // Quick Start Bottom Sheet
+    if (showQuickStartSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showQuickStartSheet = false },
+            containerColor = AmakaColors.surface
+        ) {
+            QuickStartContent(
+                workouts = uiState.todayWorkouts,
+                onWorkoutSelect = { workout ->
+                    showQuickStartSheet = false
+                    onNavigateToWorkoutDetail(workout.id)
+                },
+                onCancel = { showQuickStartSheet = false }
+            )
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -57,7 +78,7 @@ fun HomeScreen(
         // Quick action buttons (iOS style)
         item {
             QuickActionButtons(
-                onQuickStart = { /* TODO */ },
+                onQuickStart = { showQuickStartSheet = true },
                 onLogWorkout = onNavigateToVoiceWorkout
             )
         }
@@ -74,7 +95,7 @@ fun HomeScreen(
                     onLogWithVoice = onNavigateToVoiceWorkout
                 )
             } else {
-                TodayWorkoutsSection(
+                TodayWorkoutsCard(
                     workouts = uiState.todayWorkouts,
                     onWorkoutClick = onNavigateToWorkoutDetail
                 )
@@ -90,24 +111,149 @@ fun HomeScreen(
             )
         }
 
-        if (uiState.upcomingWorkouts.isNotEmpty()) {
-            item {
-                SectionHeader(
-                    title = "Upcoming Workouts",
-                    actionText = "See All",
-                    onAction = onNavigateToWorkouts
-                )
-            }
-            items(uiState.upcomingWorkouts.take(3)) { workout ->
-                WorkoutListItem(
-                    workout = workout,
-                    onClick = { onNavigateToWorkoutDetail(workout.id) }
+        item {
+            Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
+        }
+    }
+}
+
+@Composable
+private fun QuickStartContent(
+    workouts: List<Workout>,
+    onWorkoutSelect: (Workout) -> Unit,
+    onCancel: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = AmakaSpacing.md.dp)
+            .padding(bottom = AmakaSpacing.xl.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Quick Start",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = AmakaColors.textPrimary
+            )
+            TextButton(onClick = onCancel) {
+                Text(
+                    text = "Cancel",
+                    color = AmakaColors.accentBlue
                 )
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
+        Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+
+        Text(
+            text = "Select a workout to start",
+            style = MaterialTheme.typography.bodyMedium,
+            color = AmakaColors.textSecondary
+        )
+
+        Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+
+        if (workouts.isEmpty()) {
+            Text(
+                text = "No workouts available. Push a workout from the web app first.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = AmakaColors.textTertiary,
+                modifier = Modifier.padding(vertical = AmakaSpacing.lg.dp)
+            )
+        } else {
+            workouts.forEach { workout ->
+                QuickStartWorkoutItem(
+                    workout = workout,
+                    onClick = { onWorkoutSelect(workout) }
+                )
+                Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickStartWorkoutItem(
+    workout: Workout,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AmakaCornerRadius.md.dp))
+            .clickable(onClick = onClick),
+        color = AmakaColors.background,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AmakaSpacing.md.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Sport icon with colored background
+            Surface(
+                modifier = Modifier.size(48.dp),
+                color = workout.sport.color.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.FitnessCenter,
+                        contentDescription = null,
+                        tint = workout.sport.color,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(AmakaSpacing.md.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = workout.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = AmakaColors.textPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Schedule,
+                        contentDescription = null,
+                        tint = AmakaColors.textTertiary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${workout.formattedDuration} • ${workout.sport.displayName}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AmakaColors.textTertiary
+                    )
+                }
+                Text(
+                    text = "${workout.intervalCount} steps",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AmakaColors.textTertiary
+                )
+            }
+
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = AmakaColors.textTertiary
+            )
         }
     }
 }
@@ -222,10 +368,110 @@ private fun TodaysWorkoutsHeader(workoutCount: Int) {
             shape = RoundedCornerShape(AmakaCornerRadius.lg.dp)
         ) {
             Text(
-                text = "$workoutCount workouts",
+                text = "$workoutCount workout${if (workoutCount != 1) "s" else ""}",
                 style = MaterialTheme.typography.labelMedium,
                 color = AmakaColors.textSecondary,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TodayWorkoutsCard(
+    workouts: List<Workout>,
+    onWorkoutClick: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = AmakaColors.surface,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(AmakaSpacing.sm.dp)
+        ) {
+            workouts.forEachIndexed { index, workout ->
+                TodayWorkoutRow(
+                    workout = workout,
+                    onClick = { onWorkoutClick(workout.id) }
+                )
+                if (index < workouts.size - 1) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = AmakaSpacing.sm.dp),
+                        color = AmakaColors.borderLight
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodayWorkoutRow(
+    workout: Workout,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AmakaCornerRadius.sm.dp))
+            .clickable(onClick = onClick)
+            .padding(AmakaSpacing.sm.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Time column
+        Column(
+            horizontalAlignment = Alignment.Start,
+            modifier = Modifier.width(48.dp)
+        ) {
+            Text(
+                text = "9:00",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = AmakaColors.textPrimary
+            )
+            Text(
+                text = workout.formattedDuration,
+                style = MaterialTheme.typography.bodySmall,
+                color = AmakaColors.textTertiary
+            )
+        }
+
+        Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+
+        // Blue dot indicator
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(AmakaColors.accentBlue)
+        )
+
+        Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+
+        // Workout name
+        Text(
+            text = workout.name,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = AmakaColors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+
+        Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+
+        // Sport badge
+        Surface(
+            color = AmakaColors.background,
+            shape = RoundedCornerShape(AmakaCornerRadius.sm.dp)
+        ) {
+            Text(
+                text = workout.sport.displayName,
+                style = MaterialTheme.typography.labelSmall,
+                color = AmakaColors.textSecondary,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
     }
@@ -279,101 +525,6 @@ private fun EmptyWorkoutsCard(
                     color = AmakaColors.accentRed
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun SectionHeader(
-    title: String,
-    actionText: String? = null,
-    onAction: (() -> Unit)? = null
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            color = AmakaColors.textPrimary
-        )
-        if (actionText != null && onAction != null) {
-            TextButton(onClick = onAction) {
-                Text(
-                    text = actionText,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = AmakaColors.accentBlue
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TodayWorkoutsSection(
-    workouts: List<Workout>,
-    onWorkoutClick: (String) -> Unit
-) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(AmakaSpacing.md.dp)
-    ) {
-        items(workouts) { workout ->
-            WorkoutCard(
-                workout = workout,
-                onClick = { onWorkoutClick(workout.id) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun WorkoutCard(
-    workout: Workout,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .width(200.dp)
-            .clip(RoundedCornerShape(AmakaCornerRadius.md.dp))
-            .clickable(onClick = onClick),
-        color = AmakaColors.surface,
-        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(AmakaSpacing.md.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.FitnessCenter,
-                    contentDescription = null,
-                    tint = workout.sport.color,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
-                Text(
-                    text = workout.sport.displayName,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = AmakaColors.textSecondary
-                )
-            }
-            Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
-            Text(
-                text = workout.name,
-                style = MaterialTheme.typography.titleMedium,
-                color = AmakaColors.textPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
-            Text(
-                text = workout.formattedDuration,
-                style = MaterialTheme.typography.bodySmall,
-                color = AmakaColors.textTertiary
-            )
         }
     }
 }
@@ -440,64 +591,8 @@ private fun StatItem(value: String, label: String) {
     }
 }
 
-@Composable
-private fun WorkoutListItem(
-    workout: Workout,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(AmakaCornerRadius.md.dp))
-            .clickable(onClick = onClick),
-        color = AmakaColors.surface,
-        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AmakaSpacing.md.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                modifier = Modifier.size(44.dp),
-                color = workout.sport.color.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(AmakaCornerRadius.sm.dp)
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.FitnessCenter,
-                        contentDescription = null,
-                        tint = workout.sport.color,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(AmakaSpacing.md.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = workout.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = AmakaColors.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(AmakaSpacing.xs.dp))
-                Text(
-                    text = "${workout.formattedDuration} • ${workout.intervalCount} exercises",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AmakaColors.textTertiary
-                )
-            }
-        }
-    }
-}
-
 // Extension to get sport color
-private val WorkoutSport.color: androidx.compose.ui.graphics.Color
+private val WorkoutSport.color: Color
     get() = when (this) {
         WorkoutSport.RUNNING -> AmakaColors.sportRunning
         WorkoutSport.CYCLING -> AmakaColors.sportCycling
