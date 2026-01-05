@@ -26,6 +26,8 @@ data class PendingCompletionEntity(
     val minHeartRate: Int?,
     @ColumnInfo(name = "active_calories")
     val activeCalories: Int?,
+    @ColumnInfo(name = "total_calories")
+    val totalCalories: Int?,
     @ColumnInfo(name = "device_info_json")
     val deviceInfoJson: String?,
     @ColumnInfo(name = "workout_structure_json")
@@ -66,4 +68,7 @@ interface PendingCompletionDao {
 
     @Query("UPDATE pending_completions SET retry_count = retry_count + 1, last_error = :error WHERE id = :id")
     suspend fun incrementRetry(id: Long, error: String?)
+
+    @Query("DELETE FROM pending_completions WHERE retry_count >= :maxRetries")
+    suspend fun deleteFailedCompletions(maxRetries: Int = 5)
 }

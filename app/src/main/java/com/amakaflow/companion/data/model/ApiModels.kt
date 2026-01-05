@@ -135,6 +135,8 @@ data class WorkoutCompletionSubmission(
     val minHeartRate: Int? = null,
     @SerialName("active_calories")
     val activeCalories: Int? = null,
+    @SerialName("total_calories")
+    val totalCalories: Int? = null,
     @SerialName("device_info")
     val deviceInfo: CompletionDeviceInfo? = null,
     @SerialName("workout_structure")

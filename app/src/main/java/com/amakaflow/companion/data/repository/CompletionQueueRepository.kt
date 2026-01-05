@@ -61,6 +61,7 @@ class CompletionQueueRepository @Inject constructor(
             maxHeartRate = submission.maxHeartRate,
             minHeartRate = submission.minHeartRate,
             activeCalories = submission.activeCalories,
+            totalCalories = submission.totalCalories,
             deviceInfoJson = submission.deviceInfo?.let { json.encodeToString(it) },
             workoutStructureJson = submission.workoutStructure?.let { json.encodeToString(it) }
         )
