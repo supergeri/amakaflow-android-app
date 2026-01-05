@@ -3,20 +3,22 @@ package com.amakaflow.companion.ui.navigation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FitnessCenter
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -26,9 +28,18 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.amakaflow.companion.data.TestConfig
+import com.amakaflow.companion.ui.screens.calendar.CalendarScreen
+import com.amakaflow.companion.ui.screens.debug.ErrorLogScreen
+import com.amakaflow.companion.ui.screens.debug.WorkoutDebugScreen
 import com.amakaflow.companion.ui.screens.history.HistoryScreen
 import com.amakaflow.companion.ui.screens.home.HomeScreen
+import com.amakaflow.companion.ui.screens.more.MoreScreen
+import com.amakaflow.companion.ui.screens.pairing.PairingScreen
 import com.amakaflow.companion.ui.screens.settings.SettingsScreen
+import com.amakaflow.companion.ui.screens.settings.SettingsViewModel
+import com.amakaflow.companion.ui.screens.settings.TranscriptionSettingsScreen
+import com.amakaflow.companion.ui.screens.voice.VoiceWorkoutScreen
 import com.amakaflow.companion.ui.screens.workouts.WorkoutDetailScreen
 import com.amakaflow.companion.ui.screens.workouts.WorkoutsScreen
 import com.amakaflow.companion.ui.theme.AmakaColors
@@ -42,17 +53,23 @@ sealed class Screen(val route: String) {
     data object WorkoutDetail : Screen("workout/{workoutId}") {
         fun createRoute(workoutId: String) = "workout/$workoutId"
     }
+    data object Sources : Screen("sources")
     data object Calendar : Screen("calendar")
+    data object More : Screen("more")
     data object History : Screen("history")
     data object Settings : Screen("settings")
     data object Pairing : Screen("pairing")
     data object WorkoutPlayer : Screen("player/{workoutId}") {
         fun createRoute(workoutId: String) = "player/$workoutId"
     }
+    data object WorkoutDebug : Screen("workout_debug")
+    data object ErrorLog : Screen("error_log")
+    data object TranscriptionSettings : Screen("transcription_settings")
+    data object VoiceWorkout : Screen("voice_workout")
 }
 
 /**
- * Bottom navigation tabs
+ * Bottom navigation tabs - matching iOS design
  */
 sealed class BottomNavItem(
     val route: String,
@@ -72,94 +89,33 @@ sealed class BottomNavItem(
         selectedIcon = Icons.Filled.FitnessCenter,
         unselectedIcon = Icons.Outlined.FitnessCenter
     )
+    data object Sources : BottomNavItem(
+        route = Screen.Sources.route,
+        title = "Sources",
+        selectedIcon = Icons.Filled.Download,
+        unselectedIcon = Icons.Outlined.Download
+    )
     data object Calendar : BottomNavItem(
         route = Screen.Calendar.route,
         title = "Calendar",
         selectedIcon = Icons.Filled.DateRange,
         unselectedIcon = Icons.Outlined.DateRange
     )
-    data object History : BottomNavItem(
-        route = Screen.History.route,
-        title = "History",
-        selectedIcon = Icons.Filled.History,
-        unselectedIcon = Icons.Outlined.History
-    )
-    data object Settings : BottomNavItem(
-        route = Screen.Settings.route,
-        title = "Settings",
-        selectedIcon = Icons.Filled.Settings,
-        unselectedIcon = Icons.Outlined.Settings
+    data object More : BottomNavItem(
+        route = Screen.More.route,
+        title = "More",
+        selectedIcon = Icons.Filled.MoreHoriz,
+        unselectedIcon = Icons.Outlined.MoreHoriz
     )
 }
 
 val bottomNavItems = listOf(
     BottomNavItem.Home,
     BottomNavItem.Workouts,
+    BottomNavItem.Sources,
     BottomNavItem.Calendar,
-    BottomNavItem.History,
-    BottomNavItem.Settings
+    BottomNavItem.More
 )
-
-@Composable
-fun AmakaFlowNavHost(
-    navController: NavHostController,
-    modifier: Modifier = Modifier
-) {
-    NavHost(
-        navController = navController,
-        startDestination = Screen.Home.route,
-        modifier = modifier
-    ) {
-        composable(Screen.Home.route) {
-            HomeScreen(
-                onNavigateToWorkouts = {
-                    navController.navigate(Screen.Workouts.route)
-                },
-                onNavigateToWorkoutDetail = { workoutId ->
-                    navController.navigate(Screen.WorkoutDetail.createRoute(workoutId))
-                }
-            )
-        }
-
-        composable(Screen.Workouts.route) {
-            WorkoutsScreen(
-                onNavigateToWorkoutDetail = { workoutId ->
-                    navController.navigate(Screen.WorkoutDetail.createRoute(workoutId))
-                }
-            )
-        }
-
-        composable(
-            route = Screen.WorkoutDetail.route,
-            arguments = listOf(navArgument("workoutId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val workoutId = backStackEntry.arguments?.getString("workoutId") ?: return@composable
-            WorkoutDetailScreen(
-                workoutId = workoutId,
-                onNavigateBack = { navController.popBackStack() },
-                onStartWorkout = { /* Navigate to workout player */ }
-            )
-        }
-
-        composable(Screen.Calendar.route) {
-            // Placeholder for calendar screen
-            HomeScreen(
-                onNavigateToWorkouts = {},
-                onNavigateToWorkoutDetail = {}
-            )
-        }
-
-        composable(Screen.History.route) {
-            HistoryScreen(
-                onNavigateToCompletionDetail = { /* Navigate to completion detail */ }
-            )
-        }
-
-        composable(Screen.Settings.route) {
-            SettingsScreen()
-        }
-    }
-}
 
 @Composable
 fun AmakaFlowBottomNavBar(
@@ -185,12 +141,14 @@ fun AmakaFlowBottomNavBar(
                 label = { Text(item.title) },
                 selected = selected,
                 onClick = {
-                    navController.navigate(item.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
+                    if (!selected) {
+                        navController.navigate(item.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = false
+                            }
+                            launchSingleTop = true
+                            restoreState = false
                         }
-                        launchSingleTop = true
-                        restoreState = true
                     }
                 },
                 colors = NavigationBarItemDefaults.colors(
@@ -206,18 +164,157 @@ fun AmakaFlowBottomNavBar(
 }
 
 @Composable
-fun MainScreen() {
+fun MainScreen(testConfig: TestConfig) {
     val navController = rememberNavController()
+    val settingsViewModel: SettingsViewModel = hiltViewModel()
+    val settingsState by settingsViewModel.uiState.collectAsState()
+
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    // Show bottom bar only when paired and not on pairing screen
+    val showBottomBar = settingsState.isPaired && currentRoute != Screen.Pairing.route
+
+    // Start destination based on pairing state
+    val startDestination = if (settingsState.isPaired) Screen.Home.route else Screen.Pairing.route
 
     Scaffold(
         bottomBar = {
-            AmakaFlowBottomNavBar(navController = navController)
+            if (showBottomBar) {
+                AmakaFlowBottomNavBar(navController = navController)
+            }
         },
         containerColor = AmakaColors.background
     ) { innerPadding ->
-        AmakaFlowNavHost(
+        NavHost(
             navController = navController,
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding)
-        )
+        ) {
+            composable(Screen.Home.route) {
+                HomeScreen(
+                    onNavigateToWorkouts = {
+                        navController.navigate(Screen.Workouts.route)
+                    },
+                    onNavigateToWorkoutDetail = { workoutId ->
+                        navController.navigate(Screen.WorkoutDetail.createRoute(workoutId))
+                    },
+                    onNavigateToVoiceWorkout = {
+                        navController.navigate(Screen.VoiceWorkout.route)
+                    }
+                )
+            }
+
+            composable(Screen.Workouts.route) {
+                WorkoutsScreen(
+                    onNavigateToWorkoutDetail = { workoutId ->
+                        navController.navigate(Screen.WorkoutDetail.createRoute(workoutId))
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.WorkoutDetail.route,
+                arguments = listOf(navArgument("workoutId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val workoutId = backStackEntry.arguments?.getString("workoutId") ?: return@composable
+                WorkoutDetailScreen(
+                    workoutId = workoutId,
+                    onNavigateBack = { navController.popBackStack() },
+                    onStartWorkout = { /* Navigate to workout player */ }
+                )
+            }
+
+            composable(Screen.Sources.route) {
+                // Sources screen - placeholder for now, shows History as similar content
+                HistoryScreen(
+                    onNavigateToCompletionDetail = { /* Navigate to completion detail */ }
+                )
+            }
+
+            composable(Screen.Calendar.route) {
+                CalendarScreen(
+                    onNavigateToWorkouts = {
+                        navController.navigate(Screen.Workouts.route)
+                    }
+                )
+            }
+
+            composable(Screen.More.route) {
+                MoreScreen(
+                    onNavigateToHistory = {
+                        navController.navigate(Screen.History.route)
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate(Screen.Settings.route)
+                    }
+                )
+            }
+
+            composable(Screen.History.route) {
+                HistoryScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToCompletionDetail = { /* Navigate to completion detail */ }
+                )
+            }
+
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onNavigateToPairing = {
+                        navController.navigate(Screen.Pairing.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                inclusive = true
+                            }
+                        }
+                    },
+                    onNavigateToWorkoutDebug = {
+                        navController.navigate(Screen.WorkoutDebug.route)
+                    },
+                    onNavigateToErrorLog = {
+                        navController.navigate(Screen.ErrorLog.route)
+                    },
+                    onNavigateToTranscriptionSettings = {
+                        navController.navigate(Screen.TranscriptionSettings.route)
+                    }
+                )
+            }
+
+            composable(Screen.WorkoutDebug.route) {
+                WorkoutDebugScreen(
+                    onDismiss = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.ErrorLog.route) {
+                ErrorLogScreen(
+                    onDismiss = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.TranscriptionSettings.route) {
+                TranscriptionSettingsScreen(
+                    onDismiss = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.VoiceWorkout.route) {
+                VoiceWorkoutScreen(
+                    onDismiss = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.Pairing.route) {
+                PairingScreen(
+                    onPairingComplete = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Pairing.route) {
+                                inclusive = true
+                            }
+                        }
+                    },
+                    testConfig = testConfig
+                )
+            }
+        }
     }
 }

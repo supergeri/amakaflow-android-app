@@ -8,14 +8,17 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -24,14 +27,19 @@ import com.amakaflow.companion.data.model.WorkoutSport
 import com.amakaflow.companion.ui.theme.AmakaColors
 import com.amakaflow.companion.ui.theme.AmakaCornerRadius
 import com.amakaflow.companion.ui.theme.AmakaSpacing
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun HomeScreen(
     onNavigateToWorkouts: () -> Unit,
     onNavigateToWorkoutDetail: (String) -> Unit,
+    onNavigateToVoiceWorkout: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val today = LocalDate.now()
 
     LazyColumn(
         modifier = Modifier
@@ -40,23 +48,32 @@ fun HomeScreen(
             .padding(horizontal = AmakaSpacing.md.dp),
         verticalArrangement = Arrangement.spacedBy(AmakaSpacing.lg.dp)
     ) {
+        // Date header (iOS style)
         item {
             Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
-            WelcomeHeader(userName = uiState.userName)
+            DateHeader(date = today)
         }
 
+        // Quick action buttons (iOS style)
         item {
             QuickActionButtons(
                 onQuickStart = { /* TODO */ },
-                onVoiceWorkout = { /* TODO */ }
+                onLogWorkout = onNavigateToVoiceWorkout
             )
         }
 
-        if (uiState.todayWorkouts.isNotEmpty()) {
-            item {
-                SectionHeader(title = "Today's Workouts")
-            }
-            item {
+        // Today's Workouts section with count badge
+        item {
+            TodaysWorkoutsHeader(workoutCount = uiState.todayWorkouts.size)
+        }
+
+        // Workouts or empty state
+        item {
+            if (uiState.todayWorkouts.isEmpty()) {
+                EmptyWorkoutsCard(
+                    onLogWithVoice = onNavigateToVoiceWorkout
+                )
+            } else {
                 TodayWorkoutsSection(
                     workouts = uiState.todayWorkouts,
                     onWorkoutClick = onNavigateToWorkoutDetail
@@ -64,6 +81,7 @@ fun HomeScreen(
             }
         }
 
+        // This Week stats card
         item {
             WeeklyStatsCard(
                 workoutCount = uiState.weeklyStats.workoutCount,
@@ -95,18 +113,18 @@ fun HomeScreen(
 }
 
 @Composable
-private fun WelcomeHeader(userName: String?) {
+private fun DateHeader(date: LocalDate) {
     Column {
         Text(
-            text = if (userName != null) "Hey, $userName" else "Welcome back",
-            style = MaterialTheme.typography.headlineMedium,
-            color = AmakaColors.textPrimary
-        )
-        Spacer(modifier = Modifier.height(AmakaSpacing.xs.dp))
-        Text(
-            text = "Ready to crush your workout?",
+            text = date.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault())),
             style = MaterialTheme.typography.bodyLarge,
             color = AmakaColors.textSecondary
+        )
+        Text(
+            text = date.format(DateTimeFormatter.ofPattern("MMMM d", Locale.getDefault())),
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = AmakaColors.textPrimary
         )
     }
 }
@@ -114,64 +132,153 @@ private fun WelcomeHeader(userName: String?) {
 @Composable
 private fun QuickActionButtons(
     onQuickStart: () -> Unit,
-    onVoiceWorkout: () -> Unit
+    onLogWorkout: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(AmakaSpacing.md.dp)
     ) {
-        QuickActionButton(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Filled.PlayArrow,
-            label = "Quick Start",
-            color = AmakaColors.accentGreen,
-            onClick = onQuickStart
-        )
-        QuickActionButton(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Filled.Mic,
-            label = "Voice Workout",
+        // Quick Start button (blue/teal gradient style)
+        Surface(
+            modifier = Modifier
+                .weight(1f)
+                .height(80.dp)
+                .clip(RoundedCornerShape(AmakaCornerRadius.md.dp))
+                .clickable(onClick = onQuickStart),
             color = AmakaColors.accentBlue,
-            onClick = onVoiceWorkout
-        )
+            shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(AmakaSpacing.md.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    tint = AmakaColors.textPrimary,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Quick Start",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = AmakaColors.textPrimary
+                )
+            }
+        }
+
+        // Log Workout button (green solid)
+        Surface(
+            modifier = Modifier
+                .weight(1f)
+                .height(80.dp)
+                .clip(RoundedCornerShape(AmakaCornerRadius.md.dp))
+                .clickable(onClick = onLogWorkout),
+            color = AmakaColors.accentGreen,
+            shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(AmakaSpacing.md.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Mic,
+                    contentDescription = null,
+                    tint = AmakaColors.background,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Log Workout",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = AmakaColors.background
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun QuickActionButton(
-    modifier: Modifier = Modifier,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    color: androidx.compose.ui.graphics.Color,
-    onClick: () -> Unit
+private fun TodaysWorkoutsHeader(workoutCount: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Today's Workouts",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = AmakaColors.textPrimary
+        )
+        Surface(
+            color = AmakaColors.surface,
+            shape = RoundedCornerShape(AmakaCornerRadius.lg.dp)
+        ) {
+            Text(
+                text = "$workoutCount workouts",
+                style = MaterialTheme.typography.labelMedium,
+                color = AmakaColors.textSecondary,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyWorkoutsCard(
+    onLogWithVoice: () -> Unit
 ) {
     Surface(
-        modifier = modifier
-            .height(80.dp)
-            .clip(RoundedCornerShape(AmakaCornerRadius.md.dp))
-            .clickable(onClick = onClick),
-        color = color.copy(alpha = 0.15f),
+        modifier = Modifier.fillMaxWidth(),
+        color = AmakaColors.surface,
         shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(AmakaSpacing.md.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+                .fillMaxWidth()
+                .padding(AmakaSpacing.lg.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
-                imageVector = icon,
+                imageVector = Icons.Filled.CalendarMonth,
                 contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(28.dp)
+                tint = AmakaColors.textTertiary,
+                modifier = Modifier.size(48.dp)
             )
-            Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+            Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
             Text(
-                text = label,
+                text = "No workouts scheduled",
                 style = MaterialTheme.typography.titleMedium,
-                color = color
+                fontWeight = FontWeight.SemiBold,
+                color = AmakaColors.textPrimary
             )
+            Spacer(modifier = Modifier.height(AmakaSpacing.xs.dp))
+            Text(
+                text = "Add a workout from the web, or log one you've completed",
+                style = MaterialTheme.typography.bodyMedium,
+                color = AmakaColors.textSecondary
+            )
+            Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+            TextButton(onClick = onLogWithVoice) {
+                Icon(
+                    imageVector = Icons.Filled.Mic,
+                    contentDescription = null,
+                    tint = AmakaColors.accentRed,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(AmakaSpacing.xs.dp))
+                Text(
+                    text = "Log with Voice",
+                    color = AmakaColors.accentRed
+                )
+            }
         }
     }
 }
@@ -285,18 +392,30 @@ private fun WeeklyStatsCard(
         Column(
             modifier = Modifier.padding(AmakaSpacing.md.dp)
         ) {
-            Text(
-                text = "This Week",
-                style = MaterialTheme.typography.titleMedium,
-                color = AmakaColors.textSecondary
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.TrendingUp,
+                    contentDescription = null,
+                    tint = AmakaColors.accentBlue,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+                Text(
+                    text = "This Week",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AmakaColors.textPrimary
+                )
+            }
             Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 StatItem(value = workoutCount.toString(), label = "Workouts")
-                StatItem(value = totalDuration, label = "Duration")
+                StatItem(value = totalDuration, label = "Time")
                 StatItem(value = totalCalories, label = "Calories")
             }
         }

@@ -123,12 +123,37 @@ data class WorkoutCompletionSubmission(
     @SerialName("started_at")
     val startedAt: Instant,
     @SerialName("ended_at")
-    val endedAt: Instant,
+    val endedAt: Instant? = null,
     @SerialName("duration_seconds")
     val durationSeconds: Int,
     val source: CompletionSource,
-    @SerialName("health_metrics")
-    val healthMetrics: HealthMetrics? = null
+    @SerialName("avg_heart_rate")
+    val avgHeartRate: Int? = null,
+    @SerialName("max_heart_rate")
+    val maxHeartRate: Int? = null,
+    @SerialName("min_heart_rate")
+    val minHeartRate: Int? = null,
+    @SerialName("active_calories")
+    val activeCalories: Int? = null,
+    @SerialName("total_calories")
+    val totalCalories: Int? = null,
+    @SerialName("device_info")
+    val deviceInfo: CompletionDeviceInfo? = null,
+    @SerialName("workout_structure")
+    val workoutStructure: List<WorkoutIntervalSubmission>? = null
+)
+
+/**
+ * Simplified interval for workout submission
+ */
+@Serializable
+data class WorkoutIntervalSubmission(
+    val type: String,
+    val seconds: Int? = null,
+    val target: String? = null,
+    val reps: Int? = null,
+    val sets: Int? = null,
+    val name: String? = null
 )
 
 /**
@@ -238,3 +263,23 @@ data class WorkoutCompletionDetail(
             }
         }
 }
+
+/**
+ * Voice workout parsing request
+ */
+@Serializable
+data class VoiceWorkoutRequest(
+    val transcript: String,
+    val sport: String? = null
+)
+
+/**
+ * Voice workout parsing response
+ */
+@Serializable
+data class VoiceWorkoutResponse(
+    val workout: Workout? = null,
+    val error: String? = null,
+    @SerialName("raw_response")
+    val rawResponse: String? = null
+)

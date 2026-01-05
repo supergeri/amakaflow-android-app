@@ -7,6 +7,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -14,6 +17,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -32,116 +37,186 @@ fun WorkoutsScreen(
     val uiState by viewModel.uiState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AmakaColors.background)
-    ) {
-        // Header
-        Column(
-            modifier = Modifier.padding(AmakaSpacing.md.dp)
+    Scaffold(
+        containerColor = AmakaColors.background,
+        bottomBar = {
+            // Add Sample Workout button at bottom
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = AmakaColors.background
+            ) {
+                Button(
+                    onClick = { /* TODO: Add sample workout */ },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AmakaSpacing.md.dp)
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AmakaColors.accentBlue
+                    ),
+                    shape = RoundedCornerShape(AmakaCornerRadius.lg.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+                    Text(
+                        text = "Add Sample Workout",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(AmakaColors.background),
+            contentPadding = PaddingValues(horizontal = AmakaSpacing.md.dp)
         ) {
-            Text(
-                text = "Workouts",
-                style = MaterialTheme.typography.headlineMedium,
-                color = AmakaColors.textPrimary
-            )
-            Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+            // Header
+            item {
+                Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+                Text(
+                    text = "Workouts",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = AmakaColors.textPrimary,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+            }
 
             // Search bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = {
-                    searchQuery = it
-                    viewModel.search(it)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search workouts...") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = null,
-                        tint = AmakaColors.textSecondary
-                    )
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = AmakaColors.surface,
-                    unfocusedContainerColor = AmakaColors.surface,
-                    focusedBorderColor = AmakaColors.accentBlue,
-                    unfocusedBorderColor = AmakaColors.borderLight,
-                    focusedTextColor = AmakaColors.textPrimary,
-                    unfocusedTextColor = AmakaColors.textPrimary,
-                    cursorColor = AmakaColors.accentBlue
-                ),
-                shape = RoundedCornerShape(AmakaCornerRadius.md.dp),
-                singleLine = true
-            )
-        }
-
-        // Content
-        when {
-            uiState.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = AmakaColors.accentBlue)
-                }
-            }
-            uiState.error != null -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = uiState.error ?: "Unknown error",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = AmakaColors.textSecondary
+            item {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = {
+                        searchQuery = it
+                        viewModel.search(it)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search workouts...") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = AmakaColors.textSecondary
                         )
-                        Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
-                        Button(
-                            onClick = { viewModel.refresh() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = AmakaColors.accentBlue
-                            )
-                        ) {
-                            Text("Retry")
-                        }
-                    }
-                }
-            }
-            uiState.workouts.isEmpty() -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (searchQuery.isNotEmpty()) "No workouts found" else "No workouts available",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = AmakaColors.textSecondary
-                    )
-                }
-            }
-            else -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        horizontal = AmakaSpacing.md.dp,
-                        vertical = AmakaSpacing.sm.dp
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = AmakaColors.surface,
+                        unfocusedContainerColor = AmakaColors.surface,
+                        focusedBorderColor = AmakaColors.accentBlue,
+                        unfocusedBorderColor = AmakaColors.borderLight,
+                        focusedTextColor = AmakaColors.textPrimary,
+                        unfocusedTextColor = AmakaColors.textPrimary,
+                        cursorColor = AmakaColors.accentBlue
                     ),
-                    verticalArrangement = Arrangement.spacedBy(AmakaSpacing.sm.dp)
-                ) {
-                    items(uiState.workouts) { workout ->
-                        WorkoutListItem(
-                            workout = workout,
-                            onClick = { onNavigateToWorkoutDetail(workout.id) }
-                        )
-                    }
+                    shape = RoundedCornerShape(AmakaCornerRadius.md.dp),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+            }
+
+            // Upcoming Workouts section
+            item {
+                Text(
+                    text = "Upcoming Workouts",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AmakaColors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+            }
+
+            // Upcoming workouts content
+            if (uiState.workouts.isEmpty()) {
+                item {
+                    EmptyStateCard(
+                        icon = Icons.Filled.CalendarMonth,
+                        title = "No Upcoming Workouts",
+                        subtitle = "Workouts you save will appear here"
+                    )
+                    Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+                }
+            } else {
+                items(uiState.workouts) { workout ->
+                    WorkoutListItem(
+                        workout = workout,
+                        onClick = { onNavigateToWorkoutDetail(workout.id) }
+                    )
+                    Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+                }
+                item {
+                    Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
                 }
             }
+
+            // Incoming Workouts section
+            item {
+                Text(
+                    text = "Incoming Workouts",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AmakaColors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+            }
+
+            item {
+                EmptyStateCard(
+                    icon = Icons.Filled.Download,
+                    title = "No Incoming Workouts",
+                    subtitle = "Workouts synced from the web will appear here"
+                )
+                Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyStateCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = AmakaColors.surface,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AmakaSpacing.xl.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = AmakaColors.textTertiary,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = AmakaColors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(AmakaSpacing.xs.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = AmakaColors.textSecondary,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

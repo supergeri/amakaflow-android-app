@@ -94,13 +94,13 @@ class PairingRepository @Inject constructor(
                     Result.Success(pairingResponse)
                 }
                 response.code() == 400 -> {
-                    Result.Error("Invalid code")
+                    Result.Error("Invalid code", 400)
                 }
                 response.code() == 410 -> {
-                    Result.Error("Code has expired. Please generate a new one.")
+                    Result.Error("Code has expired. Please generate a new one.", 410)
                 }
                 else -> {
-                    Result.Error("Server error: ${response.code()}")
+                    Result.Error("Server error: ${response.code()}", response.code())
                 }
             }
         } catch (e: Exception) {

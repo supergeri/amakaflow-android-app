@@ -5,7 +5,7 @@ import retrofit2.Response
 import retrofit2.http.*
 
 /**
- * Amakaflow API interface for Retrofit
+ * Amakaflow Mapper API interface for Retrofit
  */
 interface AmakaflowApi {
 
@@ -19,32 +19,76 @@ interface AmakaflowApi {
 
     // MARK: - Workouts
 
+    /**
+     * Fetch workouts from connected calendars
+     */
     @GET("workouts/incoming")
     suspend fun getIncomingWorkouts(): Response<List<Workout>>
 
+    /**
+     * Fetch scheduled workouts
+     */
+    @GET("workouts/scheduled")
+    suspend fun getScheduledWorkouts(): Response<List<ScheduledWorkout>>
+
+    /**
+     * Fetch workouts pushed to this device
+     */
+    @GET("workouts/pushed")
+    suspend fun getPushedWorkouts(
+        @Query("device") device: String = "android-companion"
+    ): Response<List<Workout>>
+
+    /**
+     * Get a specific workout by ID
+     */
     @GET("workouts/{id}")
     suspend fun getWorkout(@Path("id") id: String): Response<Workout>
 
-    // MARK: - Activity History
+    // MARK: - Workout Completions (History)
 
-    @GET("completions")
+    /**
+     * List workout history with pagination
+     */
+    @GET("workouts/completions")
     suspend fun getCompletions(
         @Query("limit") limit: Int = 50,
         @Query("offset") offset: Int = 0
     ): Response<List<WorkoutCompletion>>
 
-    @GET("completion-details/{id}")
+    /**
+     * Get detailed workout completion by ID
+     */
+    @GET("workouts/completions/{id}")
     suspend fun getCompletionDetail(@Path("id") id: String): Response<WorkoutCompletionDetail>
+
+    /**
+     * Submit a completed workout
+     */
+    @POST("workouts/complete")
+    suspend fun completeWorkout(@Body submission: WorkoutCompletionSubmission): Response<WorkoutCompletion>
 }
 
 /**
- * Ingestor API interface for workout completions
+ * Ingestor API interface for workout voice parsing and completion queue
  */
 interface IngestorApi {
 
-    @POST("ios-companion/pending")
+    /**
+     * Queue a workout completion for later processing (offline support)
+     */
+    @POST("android-companion/pending")
     suspend fun queueCompletion(@Body submission: WorkoutCompletionSubmission): Response<Unit>
 
+    /**
+     * Submit a workout completion directly
+     */
     @POST("submit")
     suspend fun submitCompletion(@Body submission: WorkoutCompletionSubmission): Response<WorkoutCompletion>
+
+    /**
+     * Parse voice input into structured workout
+     */
+    @POST("workouts/parse-voice")
+    suspend fun parseVoiceWorkout(@Body request: VoiceWorkoutRequest): Response<VoiceWorkoutResponse>
 }

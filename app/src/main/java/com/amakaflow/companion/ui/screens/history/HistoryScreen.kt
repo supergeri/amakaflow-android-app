@@ -5,20 +5,28 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.amakaflow.companion.data.model.CompletionSource
-import com.amakaflow.companion.data.model.DateCategory
+import com.amakaflow.companion.data.model.WeeklySummary
 import com.amakaflow.companion.data.model.WorkoutCompletion
 import com.amakaflow.companion.ui.theme.AmakaColors
 import com.amakaflow.companion.ui.theme.AmakaCornerRadius
@@ -26,26 +34,74 @@ import com.amakaflow.companion.ui.theme.AmakaSpacing
 
 @Composable
 fun HistoryScreen(
+    onNavigateBack: () -> Unit = {},
     onNavigateToCompletionDetail: (String) -> Unit,
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // Calculate this week's stats
+    val weeklyStats = remember(uiState.completions) {
+        WeeklySummary.fromCompletions(uiState.completions)
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(AmakaColors.background)
     ) {
-        // Header
-        Column(
-            modifier = Modifier.padding(AmakaSpacing.md.dp)
+        // Header with back button and filter
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AmakaSpacing.sm.dp, vertical = AmakaSpacing.sm.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Activity History",
-                style = MaterialTheme.typography.headlineMedium,
-                color = AmakaColors.textPrimary
-            )
+            IconButton(onClick = onNavigateBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = AmakaColors.textPrimary
+                )
+            }
+
+            Surface(
+                color = AmakaColors.surface,
+                shape = RoundedCornerShape(AmakaCornerRadius.lg.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clickable { /* TODO: Show filter options */ }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.FilterList,
+                        contentDescription = null,
+                        tint = AmakaColors.textSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Filter",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = AmakaColors.textPrimary
+                    )
+                }
+            }
         }
+
+        // Title
+        Text(
+            text = "Activity History",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = AmakaColors.textPrimary,
+            modifier = Modifier.padding(horizontal = AmakaSpacing.md.dp)
+        )
+
+        Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
 
         when {
             uiState.isLoading -> {
@@ -56,50 +112,43 @@ fun HistoryScreen(
                     CircularProgressIndicator(color = AmakaColors.accentBlue)
                 }
             }
-            uiState.error != null -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = uiState.error ?: "Unknown error",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = AmakaColors.textSecondary
-                        )
-                        Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
-                        Button(
-                            onClick = { viewModel.refresh() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = AmakaColors.accentBlue
-                            )
-                        ) {
-                            Text("Retry")
-                        }
-                    }
-                }
-            }
             uiState.groupedCompletions.isEmpty() -> {
-                Box(
+                // Show empty state for both empty data and errors (graceful degradation)
+                LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    contentPadding = PaddingValues(horizontal = AmakaSpacing.md.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "No workouts yet",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = AmakaColors.textPrimary
+                    // This Week stats card (even when empty)
+                    item {
+                        ThisWeekStatsCard(
+                            workoutCount = 0,
+                            totalTime = "0m",
+                            calories = 0
                         )
-                        Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
-                        Text(
-                            text = "Complete a workout to see it here",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = AmakaColors.textSecondary
-                        )
+                        Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
+                    }
+
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "No workouts yet",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = AmakaColors.textPrimary
+                                )
+                                Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+                                Text(
+                                    text = "Complete a workout to see it here",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AmakaColors.textSecondary
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -109,12 +158,22 @@ fun HistoryScreen(
                     contentPadding = PaddingValues(horizontal = AmakaSpacing.md.dp),
                     verticalArrangement = Arrangement.spacedBy(AmakaSpacing.sm.dp)
                 ) {
+                    // This Week stats card
+                    item {
+                        ThisWeekStatsCard(
+                            workoutCount = weeklyStats.workoutCount,
+                            totalTime = weeklyStats.formattedDuration,
+                            calories = weeklyStats.totalCalories
+                        )
+                        Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+                    }
+
                     uiState.groupedCompletions.forEach { (category, completions) ->
                         item {
                             Text(
-                                text = category.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = AmakaColors.textSecondary,
+                                text = category.title.uppercase(),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = AmakaColors.textTertiary,
                                 modifier = Modifier.padding(
                                     top = AmakaSpacing.md.dp,
                                     bottom = AmakaSpacing.sm.dp
@@ -138,6 +197,57 @@ fun HistoryScreen(
 }
 
 @Composable
+private fun ThisWeekStatsCard(
+    workoutCount: Int,
+    totalTime: String,
+    calories: Int
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = AmakaColors.surface,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(AmakaSpacing.md.dp)
+        ) {
+            Text(
+                text = "THIS WEEK",
+                style = MaterialTheme.typography.labelMedium,
+                color = AmakaColors.textTertiary
+            )
+            Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatColumn(value = workoutCount.toString(), label = "workouts")
+                StatColumn(value = totalTime, label = "total time")
+                StatColumn(value = calories.toString(), label = "kcal")
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatColumn(value: String, label: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = AmakaColors.textPrimary
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = AmakaColors.textTertiary
+        )
+    }
+}
+
+@Composable
 private fun CompletionListItem(
     completion: WorkoutCompletion,
     onClick: () -> Unit
@@ -150,28 +260,129 @@ private fun CompletionListItem(
         color = AmakaColors.surface,
         shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(AmakaSpacing.md.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AmakaSpacing.md.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Green checkmark
+            Surface(
+                modifier = Modifier.size(32.dp),
+                color = AmakaColors.accentGreen,
+                shape = CircleShape
             ) {
-                Text(
-                    text = completion.workoutName,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = AmakaColors.textPrimary,
-                    modifier = Modifier.weight(1f)
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Watch,
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = AmakaColors.background,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(AmakaSpacing.md.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                // Workout name and time
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        text = completion.workoutName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AmakaColors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+                    Text(
+                        text = completion.formattedStartTime,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AmakaColors.textTertiary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(AmakaSpacing.xs.dp))
+
+                // Metrics row
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(AmakaSpacing.md.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Duration
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.Schedule,
+                            contentDescription = null,
+                            tint = AmakaColors.textTertiary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = completion.formattedDuration,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AmakaColors.textSecondary
+                        )
+                    }
+
+                    // Heart Rate
+                    completion.avgHeartRate?.let { hr ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.Favorite,
+                                contentDescription = null,
+                                tint = AmakaColors.accentRed,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = hr.toString(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AmakaColors.textSecondary
+                            )
+                        }
+                    }
+
+                    // Calories
+                    completion.activeCalories?.let { cal ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.LocalFireDepartment,
+                                contentDescription = null,
+                                tint = AmakaColors.accentOrange,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = cal.toString(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AmakaColors.textSecondary
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(AmakaSpacing.xs.dp))
+
+                // Source device
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = when (completion.source) {
+                            CompletionSource.PHONE -> Icons.Filled.Smartphone
+                            else -> Icons.Filled.Watch
+                        },
                         contentDescription = null,
                         tint = AmakaColors.textTertiary,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(12.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
@@ -181,85 +392,6 @@ private fun CompletionListItem(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AmakaSpacing.lg.dp)
-            ) {
-                // Duration
-                Column {
-                    Text(
-                        text = completion.formattedDuration,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = AmakaColors.accentBlue
-                    )
-                    Text(
-                        text = "Duration",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AmakaColors.textTertiary
-                    )
-                }
-
-                // Heart Rate
-                completion.avgHeartRate?.let { hr ->
-                    Column {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Favorite,
-                                contentDescription = null,
-                                tint = AmakaColors.accentRed,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "$hr",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = AmakaColors.textPrimary
-                            )
-                        }
-                        Text(
-                            text = "Avg HR",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = AmakaColors.textTertiary
-                        )
-                    }
-                }
-
-                // Calories
-                completion.activeCalories?.let { calories ->
-                    Column {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.LocalFireDepartment,
-                                contentDescription = null,
-                                tint = AmakaColors.accentOrange,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "$calories",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = AmakaColors.textPrimary
-                            )
-                        }
-                        Text(
-                            text = "Calories",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = AmakaColors.textTertiary
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
-            Text(
-                text = completion.formattedStartTime,
-                style = MaterialTheme.typography.labelSmall,
-                color = AmakaColors.textTertiary
-            )
         }
     }
 }
