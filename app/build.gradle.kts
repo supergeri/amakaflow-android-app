@@ -99,6 +99,9 @@ dependencies {
     // Image Loading
     implementation(libs.coil.compose)
 
+    // Accompanist
+    implementation(libs.accompanist.permissions)
+
     // Camera & QR Scanning
     implementation(libs.camerax.core)
     implementation(libs.camerax.camera2)

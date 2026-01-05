@@ -25,16 +25,25 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amakaflow.companion.BuildConfig
+import com.amakaflow.companion.data.TestConfig
 import com.amakaflow.companion.ui.components.QRCodeScanner
 import com.amakaflow.companion.ui.theme.AmakaColors
+import com.amakaflow.companion.ui.theme.AmakaSpacing
 
 @Composable
 fun PairingScreen(
     onPairingComplete: () -> Unit,
+    testConfig: TestConfig,
     viewModel: PairingViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    // Test mode dialog state (only in debug builds)
+    var showTestModeDialog by remember { mutableStateOf(false) }
+    var testAuthSecret by remember { mutableStateOf("") }
+    var testUserId by remember { mutableStateOf("") }
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -193,7 +202,95 @@ fun PairingScreen(
             textAlign = TextAlign.Center
         )
 
+        // Developer testing option (debug builds only)
+        if (BuildConfig.DEBUG) {
+            Spacer(modifier = Modifier.height(16.dp))
+            TextButton(
+                onClick = { showTestModeDialog = true }
+            ) {
+                Text(
+                    text = "Skip for E2E Testing",
+                    color = AmakaColors.accentOrange,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
+    }
+
+    // Test mode configuration dialog
+    if (showTestModeDialog) {
+        AlertDialog(
+            onDismissRequest = { showTestModeDialog = false },
+            title = { Text("Enable E2E Test Mode") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(AmakaSpacing.md.dp)) {
+                    Text(
+                        text = "Enter test credentials to bypass authentication for E2E testing.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AmakaColors.textSecondary
+                    )
+                    Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+                    OutlinedTextField(
+                        value = testAuthSecret,
+                        onValueChange = { testAuthSecret = it },
+                        label = { Text("Auth Secret") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AmakaColors.accentBlue,
+                            unfocusedBorderColor = AmakaColors.textTertiary,
+                            focusedLabelColor = AmakaColors.accentBlue,
+                            unfocusedLabelColor = AmakaColors.textSecondary,
+                            cursorColor = AmakaColors.accentBlue,
+                            focusedTextColor = AmakaColors.textPrimary,
+                            unfocusedTextColor = AmakaColors.textPrimary
+                        )
+                    )
+                    OutlinedTextField(
+                        value = testUserId,
+                        onValueChange = { testUserId = it },
+                        label = { Text("User ID") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AmakaColors.accentBlue,
+                            unfocusedBorderColor = AmakaColors.textTertiary,
+                            focusedLabelColor = AmakaColors.accentBlue,
+                            unfocusedLabelColor = AmakaColors.textSecondary,
+                            cursorColor = AmakaColors.accentBlue,
+                            focusedTextColor = AmakaColors.textPrimary,
+                            unfocusedTextColor = AmakaColors.textPrimary
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (testAuthSecret.isNotBlank() && testUserId.isNotBlank()) {
+                            testConfig.enableTestMode(testAuthSecret, testUserId)
+                            testAuthSecret = ""
+                            testUserId = ""
+                            showTestModeDialog = false
+                            onPairingComplete()
+                        }
+                    },
+                    enabled = testAuthSecret.isNotBlank() && testUserId.isNotBlank()
+                ) {
+                    Text("Enable & Skip Pairing")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTestModeDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            containerColor = AmakaColors.surface,
+            titleContentColor = AmakaColors.textPrimary,
+            textContentColor = AmakaColors.textSecondary
+        )
     }
 }
 

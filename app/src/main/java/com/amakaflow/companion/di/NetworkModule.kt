@@ -2,6 +2,7 @@ package com.amakaflow.companion.di
 
 import com.amakaflow.companion.BuildConfig
 import com.amakaflow.companion.data.AppEnvironment
+import com.amakaflow.companion.data.TestConfig
 import com.amakaflow.companion.data.api.AmakaflowApi
 import com.amakaflow.companion.data.api.AuthAuthenticator
 import com.amakaflow.companion.data.api.AuthStateManager
@@ -68,22 +69,25 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideAuthInterceptor(secureStorage: SecureStorage): Interceptor {
+    fun provideAuthInterceptor(
+        secureStorage: SecureStorage,
+        testConfig: TestConfig
+    ): Interceptor {
         return Interceptor { chain ->
             val request = chain.request().newBuilder()
 
-            // Add JWT token if available
-            secureStorage.getToken()?.let { token ->
-                request.addHeader("Authorization", "Bearer $token")
-            }
-
-            // Add E2E test headers if configured
-            if (BuildConfig.DEBUG) {
-                getTestAuthSecret()?.let { secret ->
+            // Check for E2E test mode first (takes precedence)
+            if (BuildConfig.DEBUG && testConfig.isTestModeEnabled) {
+                testConfig.testAuthSecret?.let { secret ->
                     request.addHeader("X-Test-Auth", secret)
-                    getTestUserId()?.let { userId ->
+                    testConfig.testUserId?.let { userId ->
                         request.addHeader("X-Test-User-Id", userId)
                     }
+                }
+            } else {
+                // Add JWT token if available
+                secureStorage.getToken()?.let { token ->
+                    request.addHeader("Authorization", "Bearer $token")
                 }
             }
 
@@ -91,9 +95,6 @@ object NetworkModule {
             chain.proceed(request.build())
         }
     }
-
-    private fun getTestAuthSecret(): String? = System.getenv("TEST_AUTH_SECRET")
-    private fun getTestUserId(): String? = System.getenv("TEST_USER_ID")
 
     @Provides
     @Singleton

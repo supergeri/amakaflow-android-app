@@ -1,44 +1,59 @@
 package com.amakaflow.companion.ui.screens.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.amakaflow.companion.data.AppEnvironment
+import com.amakaflow.companion.data.TestConfig
 import com.amakaflow.companion.ui.theme.AmakaColors
 import com.amakaflow.companion.ui.theme.AmakaCornerRadius
 import com.amakaflow.companion.ui.theme.AmakaSpacing
 
+enum class WorkoutDevice(val title: String, val subtitle: String) {
+    WEAR_OS_PHONE("Wear OS + Android Phone", "Watch tracks • Phone guides"),
+    PHONE_ONLY("Android Phone Only", "Full-screen follow-along")
+}
+
+enum class MusicBehavior {
+    DUCK, PAUSE
+}
+
 @Composable
 fun SettingsScreen(
     onNavigateToPairing: () -> Unit = {},
+    onNavigateToWorkoutDebug: () -> Unit = {},
+    onNavigateToErrorLog: () -> Unit = {},
+    onNavigateToTranscriptionSettings: () -> Unit = {},
+    testConfig: TestConfig? = null,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showEnvironmentDialog by remember { mutableStateOf(false) }
     var showUnpairDialog by remember { mutableStateOf(false) }
 
-    // Navigate to pairing after unpair
-    LaunchedEffect(uiState.isPaired) {
-        if (!uiState.isPaired) {
-            // Delay navigation slightly to let dialog close
-            kotlinx.coroutines.delay(100)
-            // Only navigate if we were previously showing the unpair dialog
-            // This prevents auto-navigation on first load
-        }
-    }
+    // Settings state
+    var selectedDevice by remember { mutableStateOf(WorkoutDevice.PHONE_ONLY) }
+    var voiceCuesEnabled by remember { mutableStateOf(true) }
+    var musicBehavior by remember { mutableStateOf(MusicBehavior.DUCK) }
+    var countdownBeepsEnabled by remember { mutableStateOf(true) }
+    var hapticFeedbackEnabled by remember { mutableStateOf(true) }
 
     LazyColumn(
         modifier = Modifier
@@ -51,104 +66,217 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
             Text(
                 text = "Settings",
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
                 color = AmakaColors.textPrimary
             )
             Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
         }
 
-        // Account section
+        // WORKOUT DEVICE section
         item {
-            SectionHeader("Account")
+            SectionHeader("WORKOUT DEVICE")
         }
         item {
-            if (uiState.isPaired) {
-                SettingsItem(
-                    icon = Icons.Filled.Person,
-                    title = uiState.userEmail ?: "Connected",
-                    subtitle = "Device paired",
-                    onClick = {}
-                )
-            } else {
-                SettingsItem(
-                    icon = Icons.Filled.QrCodeScanner,
-                    title = "Pair Device",
-                    subtitle = "Scan QR code to connect",
-                    onClick = onNavigateToPairing
-                )
-            }
-        }
-
-        // Device section
-        item {
-            Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
-            SectionHeader("Device")
-        }
-        item {
-            SettingsItem(
+            DeviceOptionItem(
                 icon = Icons.Filled.Watch,
-                title = "Wearable",
-                subtitle = "Configure smartwatch connection",
-                onClick = {}
+                iconBackground = AmakaColors.accentBlue.copy(alpha = 0.2f),
+                iconTint = AmakaColors.accentBlue,
+                title = WorkoutDevice.WEAR_OS_PHONE.title,
+                subtitle = WorkoutDevice.WEAR_OS_PHONE.subtitle,
+                isSelected = selectedDevice == WorkoutDevice.WEAR_OS_PHONE,
+                onClick = { selectedDevice = WorkoutDevice.WEAR_OS_PHONE }
+            )
+        }
+        item {
+            DeviceOptionItem(
+                icon = Icons.Filled.PhoneAndroid,
+                iconBackground = AmakaColors.accentGreen.copy(alpha = 0.2f),
+                iconTint = AmakaColors.accentGreen,
+                title = WorkoutDevice.PHONE_ONLY.title,
+                subtitle = WorkoutDevice.PHONE_ONLY.subtitle,
+                isSelected = selectedDevice == WorkoutDevice.PHONE_ONLY,
+                onClick = { selectedDevice = WorkoutDevice.PHONE_ONLY }
             )
         }
 
-        // Developer section
+        // AUDIO CUES section
+        item {
+            Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+            SectionHeader("AUDIO CUES")
+        }
+        item {
+            ToggleSettingItem(
+                icon = Icons.AutoMirrored.Filled.VolumeUp,
+                iconBackground = AmakaColors.accentBlue.copy(alpha = 0.2f),
+                iconTint = AmakaColors.accentBlue,
+                title = "Voice Cues",
+                subtitle = "Announce exercise names and transitions",
+                isEnabled = voiceCuesEnabled,
+                onToggle = { voiceCuesEnabled = it }
+            )
+        }
+
+        // Music behavior toggle (only show if voice cues enabled)
+        if (voiceCuesEnabled) {
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = AmakaColors.surface,
+                    shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(AmakaSpacing.md.dp)
+                    ) {
+                        Text(
+                            text = "When music is playing:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AmakaColors.textSecondary
+                        )
+                        Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(AmakaSpacing.sm.dp)
+                        ) {
+                            MusicBehaviorButton(
+                                text = "Duck music",
+                                isSelected = musicBehavior == MusicBehavior.DUCK,
+                                onClick = { musicBehavior = MusicBehavior.DUCK },
+                                modifier = Modifier.weight(1f)
+                            )
+                            MusicBehaviorButton(
+                                text = "Pause music",
+                                isSelected = musicBehavior == MusicBehavior.PAUSE,
+                                onClick = { musicBehavior = MusicBehavior.PAUSE },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            ToggleSettingItem(
+                icon = Icons.Filled.Timer,
+                iconBackground = AmakaColors.accentBlue.copy(alpha = 0.2f),
+                iconTint = AmakaColors.accentBlue,
+                title = "Countdown Beeps",
+                subtitle = "Audio beeps for last 5 seconds of timed intervals",
+                isEnabled = countdownBeepsEnabled,
+                onToggle = { countdownBeepsEnabled = it }
+            )
+        }
+        item {
+            ToggleSettingItem(
+                icon = Icons.Filled.Vibration,
+                iconBackground = AmakaColors.accentBlue.copy(alpha = 0.2f),
+                iconTint = AmakaColors.accentBlue,
+                title = "Haptic Feedback",
+                subtitle = "Vibrate on exercise transitions (watch & phone)",
+                isEnabled = hapticFeedbackEnabled,
+                onToggle = { hapticFeedbackEnabled = it }
+            )
+        }
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = AmakaSpacing.sm.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Info,
+                    contentDescription = null,
+                    tint = AmakaColors.textTertiary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+                Text(
+                    text = "Audio cues work with any music app. Your music controls remain accessible via headphones, Control Center, or lock screen.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AmakaColors.textTertiary
+                )
+            }
+        }
+
+        // VOICE TRANSCRIPTION section
+        item {
+            Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+            SectionHeader("VOICE TRANSCRIPTION")
+        }
+        item {
+            NavigationSettingItem(
+                icon = Icons.Filled.GraphicEq,
+                iconBackground = Color(0xFF9C27B0).copy(alpha = 0.2f),
+                iconTint = Color(0xFF9C27B0),
+                title = "Transcription Settings",
+                subtitle = "Provider, accent, and personal dictionary",
+                onClick = onNavigateToTranscriptionSettings
+            )
+        }
+
+        // INTEGRATIONS section
+        item {
+            Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+            SectionHeader("INTEGRATIONS")
+        }
+        item {
+            IntegrationItem(
+                icon = Icons.Filled.Favorite,
+                iconBackground = AmakaColors.accentRed,
+                title = "Health Connect",
+                subtitle = "Sync workouts and activity data",
+                isConnected = false,
+                onReauthorize = { /* Re-authorize Health Connect */ }
+            )
+        }
+
+        // ACCOUNT section
+        item {
+            Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+            SectionHeader("ACCOUNT")
+        }
+        item {
+            AccountInfoCard(
+                userName = uiState.userEmail?.substringBefore("@")?.replace("+", " ")?.replaceFirstChar { it.uppercase() } ?: "User",
+                userEmail = uiState.userEmail ?: "Not connected",
+                isConnected = uiState.isPaired,
+                environment = uiState.environment.displayName,
+                appVersion = uiState.appVersion,
+                onCopyToken = { /* Copy API token */ },
+                onRefreshToken = { /* Refresh token */ },
+                onViewErrorLog = onNavigateToErrorLog,
+                onCheckNow = { /* Check pending workouts */ },
+                onWorkoutDebug = onNavigateToWorkoutDebug,
+                errorCount = 0,
+                onEnvironmentClick = { showEnvironmentDialog = true }
+            )
+        }
         item {
             Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
-            SectionHeader("Developer")
-        }
-        item {
-            SettingsItem(
-                icon = Icons.Filled.Code,
-                title = "Environment",
-                subtitle = uiState.environment.displayName,
-                onClick = { showEnvironmentDialog = true }
-            )
-        }
-        item {
-            SettingsItem(
-                icon = Icons.Filled.BugReport,
-                title = "Debug Logs",
-                subtitle = "View app logs",
-                onClick = {}
+            DisconnectButton(
+                onClick = { showUnpairDialog = true }
             )
         }
 
-        // Disconnect section
-        if (uiState.isPaired) {
-            item {
-                Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
-            }
-            item {
-                SettingsItem(
-                    icon = Icons.AutoMirrored.Filled.Logout,
-                    title = "Disconnect Device",
-                    subtitle = "Unpair this device",
-                    iconTint = AmakaColors.accentRed,
-                    onClick = { showUnpairDialog = true }
-                )
-            }
+        // LEGAL section
+        item {
+            Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+            SectionHeader("LEGAL")
+        }
+        item {
+            NavigationSettingItem(
+                icon = Icons.Filled.Info,
+                iconBackground = AmakaColors.accentBlue.copy(alpha = 0.2f),
+                iconTint = AmakaColors.accentBlue,
+                title = "About",
+                subtitle = null,
+                onClick = { /* Navigate to about */ }
+            )
         }
 
-        // App info
         item {
-            Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "AmakaFlow Companion",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = AmakaColors.textTertiary
-                )
-                Text(
-                    text = "Version ${uiState.appVersion}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AmakaColors.textTertiary
-                )
-            }
             Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
         }
     }
@@ -203,7 +331,7 @@ fun SettingsScreen(
     if (showUnpairDialog) {
         AlertDialog(
             onDismissRequest = { showUnpairDialog = false },
-            title = { Text("Disconnect Device?") },
+            title = { Text("Disconnect Account?") },
             text = {
                 Text("This will remove the connection to your account. You can pair again anytime.")
             },
@@ -237,18 +365,187 @@ fun SettingsScreen(
 private fun SectionHeader(title: String) {
     Text(
         text = title,
-        style = MaterialTheme.typography.labelLarge,
-        color = AmakaColors.textSecondary,
+        style = MaterialTheme.typography.labelMedium,
+        color = AmakaColors.textTertiary,
         modifier = Modifier.padding(vertical = AmakaSpacing.sm.dp)
     )
 }
 
 @Composable
-private fun SettingsItem(
+private fun DeviceOptionItem(
     icon: ImageVector,
+    iconBackground: Color,
+    iconTint: Color,
     title: String,
     subtitle: String,
-    iconTint: androidx.compose.ui.graphics.Color = AmakaColors.textSecondary,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (isSelected) {
+                    Modifier.border(
+                        width = 2.dp,
+                        color = AmakaColors.accentBlue,
+                        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+                    )
+                } else {
+                    Modifier
+                }
+            )
+            .clip(RoundedCornerShape(AmakaCornerRadius.md.dp))
+            .clickable(onClick = onClick),
+        color = AmakaColors.surface,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AmakaSpacing.md.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                color = iconBackground,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(AmakaSpacing.md.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = AmakaColors.textPrimary
+                    )
+                    if (isSelected) {
+                        Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = "Selected",
+                            tint = AmakaColors.accentBlue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AmakaColors.textSecondary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToggleSettingItem(
+    icon: ImageVector,
+    iconBackground: Color,
+    iconTint: Color,
+    title: String,
+    subtitle: String,
+    isEnabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = AmakaColors.surface,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AmakaSpacing.md.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                color = iconBackground,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(AmakaSpacing.md.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = AmakaColors.textPrimary
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AmakaColors.textSecondary
+                )
+            }
+            Switch(
+                checked = isEnabled,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = AmakaColors.textPrimary,
+                    checkedTrackColor = AmakaColors.accentBlue,
+                    uncheckedThumbColor = AmakaColors.textTertiary,
+                    uncheckedTrackColor = AmakaColors.surface
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun MusicBehaviorButton(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(AmakaCornerRadius.lg.dp))
+            .clickable(onClick = onClick),
+        color = if (isSelected) AmakaColors.accentBlue else AmakaColors.background,
+        shape = RoundedCornerShape(AmakaCornerRadius.lg.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (isSelected) AmakaColors.textPrimary else AmakaColors.textSecondary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+        )
+    }
+}
+
+@Composable
+private fun NavigationSettingItem(
+    icon: ImageVector,
+    iconBackground: Color,
+    iconTint: Color,
+    title: String,
+    subtitle: String?,
     onClick: () -> Unit
 ) {
     Surface(
@@ -265,12 +562,23 @@ private fun SettingsItem(
                 .padding(AmakaSpacing.md.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(24.dp)
-            )
+            Surface(
+                modifier = Modifier.size(40.dp),
+                color = iconBackground,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
             Spacer(modifier = Modifier.width(AmakaSpacing.md.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -278,17 +586,392 @@ private fun SettingsItem(
                     style = MaterialTheme.typography.titleMedium,
                     color = AmakaColors.textPrimary
                 )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AmakaColors.textSecondary
-                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AmakaColors.textSecondary
+                    )
+                }
             }
             Icon(
                 imageVector = Icons.Filled.ChevronRight,
                 contentDescription = null,
                 tint = AmakaColors.textTertiary,
                 modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun IntegrationItem(
+    icon: ImageVector,
+    iconBackground: Color,
+    title: String,
+    subtitle: String,
+    isConnected: Boolean,
+    onReauthorize: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = AmakaColors.surface,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(AmakaSpacing.md.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(40.dp),
+                    color = iconBackground,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = AmakaColors.textPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(AmakaSpacing.md.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = AmakaColors.textPrimary
+                        )
+                        if (isConnected) {
+                            Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+                            Text(
+                                text = "✓ Connected",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AmakaColors.accentGreen
+                            )
+                        }
+                    }
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AmakaColors.textSecondary
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+            OutlinedButton(
+                onClick = onReauthorize,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = AmakaColors.textPrimary
+                ),
+                border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
+                    brush = androidx.compose.ui.graphics.SolidColor(AmakaColors.borderLight)
+                ),
+                shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+            ) {
+                Text(if (isConnected) "Re-authorize Health" else "Connect Health")
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountInfoCard(
+    userName: String,
+    userEmail: String,
+    isConnected: Boolean,
+    environment: String,
+    appVersion: String,
+    onCopyToken: () -> Unit,
+    onRefreshToken: () -> Unit,
+    onViewErrorLog: () -> Unit,
+    onCheckNow: () -> Unit,
+    onWorkoutDebug: () -> Unit,
+    errorCount: Int,
+    onEnvironmentClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = AmakaColors.surface,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(AmakaSpacing.md.dp)
+        ) {
+            // User info row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(48.dp),
+                    color = AmakaColors.accentGreen,
+                    shape = CircleShape
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = null,
+                            tint = AmakaColors.background,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(AmakaSpacing.md.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = userName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AmakaColors.textPrimary
+                    )
+                    Text(
+                        text = userEmail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AmakaColors.textSecondary
+                    )
+                }
+                if (isConnected) {
+                    Surface(
+                        color = AmakaColors.accentGreen.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(AmakaCornerRadius.lg.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(AmakaColors.accentGreen, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Connected",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AmakaColors.accentGreen
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+
+            // Info rows
+            AccountInfoRow(
+                icon = Icons.Filled.Cloud,
+                label = "Environment: $environment",
+                onClick = onEnvironmentClick
+            )
+            AccountInfoRow(
+                icon = Icons.Filled.Info,
+                label = "Version $appVersion"
+            )
+            AccountInfoRow(
+                icon = Icons.Filled.Key,
+                label = "API Token",
+                action = {
+                    SmallButton(text = "Copy", color = AmakaColors.accentBlue, onClick = onCopyToken)
+                }
+            )
+            AccountInfoRow(
+                icon = Icons.Filled.Refresh,
+                label = "Refresh Token",
+                action = {
+                    SmallButton(text = "Refresh", color = AmakaColors.accentGreen, onClick = onRefreshToken)
+                }
+            )
+            AccountInfoRow(
+                icon = Icons.Filled.BugReport,
+                label = "Error Log",
+                action = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(onClick = onViewErrorLog)
+                    ) {
+                        Text(
+                            text = errorCount.toString(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AmakaColors.textSecondary
+                        )
+                        Icon(
+                            imageVector = Icons.Filled.ChevronRight,
+                            contentDescription = null,
+                            tint = AmakaColors.textTertiary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+
+            // Pending workouts
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Schedule,
+                    contentDescription = null,
+                    tint = AmakaColors.textTertiary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+                Text(
+                    text = "Pending Workouts:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AmakaColors.textSecondary
+                )
+            }
+            Text(
+                text = "No pending workouts",
+                style = MaterialTheme.typography.bodySmall,
+                color = AmakaColors.textTertiary,
+                modifier = Modifier.padding(start = 24.dp, top = 4.dp)
+            )
+
+            Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+
+            // Action buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AmakaSpacing.sm.dp)
+            ) {
+                SmallButton(
+                    text = "Check Now",
+                    color = AmakaColors.accentBlue,
+                    onClick = onCheckNow
+                )
+                SmallButton(
+                    text = "Workout Debug",
+                    color = AmakaColors.accentOrange,
+                    onClick = onWorkoutDebug,
+                    icon = Icons.Filled.BugReport
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountInfoRow(
+    icon: ImageVector,
+    label: String,
+    action: (@Composable () -> Unit)? = null,
+    onClick: (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = AmakaSpacing.xs.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = AmakaColors.textTertiary,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = AmakaColors.textSecondary,
+            modifier = Modifier.weight(1f)
+        )
+        action?.invoke()
+    }
+}
+
+@Composable
+private fun SmallButton(
+    text: String,
+    color: Color,
+    onClick: () -> Unit,
+    icon: ImageVector? = null
+) {
+    Surface(
+        modifier = Modifier
+            .clip(RoundedCornerShape(AmakaCornerRadius.sm.dp))
+            .clickable(onClick = onClick),
+        color = color,
+        shape = RoundedCornerShape(AmakaCornerRadius.sm.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = AmakaColors.textPrimary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                color = AmakaColors.textPrimary
+            )
+        }
+    }
+}
+
+@Composable
+private fun DisconnectButton(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AmakaCornerRadius.md.dp))
+            .clickable(onClick = onClick),
+        color = AmakaColors.surface,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AmakaSpacing.md.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                color = AmakaColors.accentRed.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ExitToApp,
+                        contentDescription = null,
+                        tint = AmakaColors.accentRed,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(AmakaSpacing.md.dp))
+            Text(
+                text = "Disconnect Account",
+                style = MaterialTheme.typography.titleMedium,
+                color = AmakaColors.textPrimary
             )
         }
     }
