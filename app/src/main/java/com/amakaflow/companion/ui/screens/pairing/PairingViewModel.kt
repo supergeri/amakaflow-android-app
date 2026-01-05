@@ -1,5 +1,7 @@
 package com.amakaflow.companion.ui.screens.pairing
 
+import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amakaflow.companion.data.repository.PairingRepository
@@ -8,6 +10,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val TAG = "PairingViewModel"
 
 enum class PairingMode {
     QR_CODE,
@@ -50,7 +54,42 @@ class PairingViewModel @Inject constructor(
 
     fun onQRCodeScanned(code: String) {
         if (_uiState.value.isLoading) return
-        pair(code)
+
+        // Extract token from URL if QR contains amakaflow:// or https:// URL
+        val token = extractTokenFromQRCode(code)
+        Log.d(TAG, "QR code scanned: $code -> extracted token: $token")
+        pair(token)
+    }
+
+    /**
+     * Extract pairing token from QR code content.
+     *
+     * Supports formats:
+     * - amakaflow://pair?token=xxx
+     * - https://app.amakaflow.com/pair?token=xxx
+     * - Raw token string
+     * - 6-character short code
+     */
+    private fun extractTokenFromQRCode(qrValue: String): String {
+        return try {
+            when {
+                // Handle amakaflow:// deep links
+                qrValue.startsWith("amakaflow://") -> {
+                    val uri = Uri.parse(qrValue)
+                    uri.getQueryParameter("token") ?: qrValue
+                }
+                // Handle https:// URLs
+                qrValue.startsWith("https://") || qrValue.startsWith("http://") -> {
+                    val uri = Uri.parse(qrValue)
+                    uri.getQueryParameter("token") ?: qrValue
+                }
+                // Raw token or short code
+                else -> qrValue
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse QR code as URL, using raw value", e)
+            qrValue
+        }
     }
 
     fun submitManualCode() {
