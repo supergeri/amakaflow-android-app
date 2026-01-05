@@ -4,6 +4,7 @@ import com.amakaflow.companion.data.api.AmakaflowApi
 import com.amakaflow.companion.data.model.Workout
 import com.amakaflow.companion.data.model.WorkoutCompletion
 import com.amakaflow.companion.data.model.WorkoutCompletionDetail
+import com.amakaflow.companion.data.model.WorkoutCompletionSubmission
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
@@ -84,6 +85,22 @@ class WorkoutRepository @Inject constructor(
             }
         } catch (e: Exception) {
             emit(Result.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    /**
+     * Submit a completed workout to the API
+     */
+    suspend fun completeWorkout(submission: WorkoutCompletionSubmission): Result<WorkoutCompletion> {
+        return try {
+            val response = api.completeWorkout(submission)
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error("Failed to submit completion", response.code())
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Unknown error")
         }
     }
 }

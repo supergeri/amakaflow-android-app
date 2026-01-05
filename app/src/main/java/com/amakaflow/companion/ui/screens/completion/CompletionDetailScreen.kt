@@ -34,6 +34,7 @@ import kotlinx.datetime.toLocalDateTime
 fun CompletionDetailScreen(
     completionId: String,
     onNavigateBack: () -> Unit,
+    onRunAgain: ((String) -> Unit)? = null,
     viewModel: CompletionDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -95,14 +96,20 @@ fun CompletionDetailScreen(
                 }
             }
             uiState.completion != null -> {
-                CompletionDetailContent(completion = uiState.completion!!)
+                CompletionDetailContent(
+                    completion = uiState.completion!!,
+                    onRunAgain = onRunAgain
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CompletionDetailContent(completion: WorkoutCompletionDetail) {
+private fun CompletionDetailContent(
+    completion: WorkoutCompletionDetail,
+    onRunAgain: ((String) -> Unit)? = null
+) {
     val localDateTime = completion.startedAt.toLocalDateTime(TimeZone.currentSystemDefault())
     val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
     val dateString = "${months[localDateTime.monthNumber - 1]} ${localDateTime.dayOfMonth}, ${localDateTime.year}"
@@ -403,6 +410,31 @@ private fun CompletionDetailContent(completion: WorkoutCompletionDetail) {
                             )
                         }
                     }
+                }
+            }
+        }
+
+        // Run Again button (only if workout has a workoutId)
+        if (completion.workoutId != null && onRunAgain != null) {
+            item {
+                Button(
+                    onClick = { onRunAgain(completion.workoutId!!) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AmakaColors.accentGreen
+                    ),
+                    shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+                    Text(
+                        text = "Run Again",
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
