@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +34,7 @@ import com.amakaflow.companion.ui.theme.AmakaColors
 import com.amakaflow.companion.ui.theme.AmakaCornerRadius
 import com.amakaflow.companion.ui.theme.AmakaSpacing
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
     onNavigateBack: () -> Unit = {},
@@ -39,10 +42,26 @@ fun HistoryScreen(
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val listState = rememberLazyListState()
 
     // Calculate this week's stats
     val weeklyStats = remember(uiState.completions) {
         WeeklySummary.fromCompletions(uiState.completions)
+    }
+
+    // Detect when scrolled to bottom for pagination
+    val shouldLoadMore = remember {
+        derivedStateOf {
+            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val totalItems = listState.layoutInfo.totalItemsCount
+            lastVisibleItem >= totalItems - 3 && uiState.canLoadMore
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore.value) {
+        if (shouldLoadMore.value) {
+            viewModel.loadMore()
+        }
     }
 
     Column(
@@ -104,7 +123,7 @@ fun HistoryScreen(
         Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
 
         when {
-            uiState.isLoading -> {
+            uiState.isLoading && !uiState.isRefreshing -> {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -112,83 +131,111 @@ fun HistoryScreen(
                     CircularProgressIndicator(color = AmakaColors.accentBlue)
                 }
             }
-            uiState.groupedCompletions.isEmpty() -> {
-                // Show empty state for both empty data and errors (graceful degradation)
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = AmakaSpacing.md.dp)
+            else -> {
+                PullToRefreshBox(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = { viewModel.refresh() },
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    // This Week stats card (even when empty)
-                    item {
-                        ThisWeekStatsCard(
-                            workoutCount = 0,
-                            totalTime = "0m",
-                            calories = 0
-                        )
-                        Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
-                    }
-
-                    item {
-                        Box(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentAlignment = Alignment.Center
+                    if (uiState.groupedCompletions.isEmpty() && !uiState.isLoading) {
+                        // Show empty state for both empty data and errors (graceful degradation)
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = AmakaSpacing.md.dp)
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "No workouts yet",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = AmakaColors.textPrimary
+                            // This Week stats card (even when empty)
+                            item {
+                                ThisWeekStatsCard(
+                                    workoutCount = 0,
+                                    totalTime = "0m",
+                                    calories = 0
                                 )
-                                Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
-                                Text(
-                                    text = "Complete a workout to see it here",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = AmakaColors.textSecondary
-                                )
+                                Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
+                            }
+
+                            item {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = "No workouts yet",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = AmakaColors.textPrimary
+                                        )
+                                        Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+                                        Text(
+                                            text = "Complete a workout to see it here",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = AmakaColors.textSecondary
+                                        )
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-            }
-            else -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = AmakaSpacing.md.dp),
-                    verticalArrangement = Arrangement.spacedBy(AmakaSpacing.sm.dp)
-                ) {
-                    // This Week stats card
-                    item {
-                        ThisWeekStatsCard(
-                            workoutCount = weeklyStats.workoutCount,
-                            totalTime = weeklyStats.formattedDuration,
-                            calories = weeklyStats.totalCalories
-                        )
-                        Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
-                    }
-
-                    uiState.groupedCompletions.forEach { (category, completions) ->
-                        item {
-                            Text(
-                                text = category.title.uppercase(),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = AmakaColors.textTertiary,
-                                modifier = Modifier.padding(
-                                    top = AmakaSpacing.md.dp,
-                                    bottom = AmakaSpacing.sm.dp
+                    } else {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = AmakaSpacing.md.dp),
+                            verticalArrangement = Arrangement.spacedBy(AmakaSpacing.sm.dp)
+                        ) {
+                            // This Week stats card
+                            item {
+                                ThisWeekStatsCard(
+                                    workoutCount = weeklyStats.workoutCount,
+                                    totalTime = weeklyStats.formattedDuration,
+                                    calories = weeklyStats.totalCalories
                                 )
-                            )
+                                Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+                            }
+
+                            uiState.groupedCompletions.forEach { (category, completions) ->
+                                item {
+                                    Text(
+                                        text = category.title.uppercase(),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = AmakaColors.textTertiary,
+                                        modifier = Modifier.padding(
+                                            top = AmakaSpacing.md.dp,
+                                            bottom = AmakaSpacing.sm.dp
+                                        )
+                                    )
+                                }
+                                items(completions) { completion ->
+                                    CompletionListItem(
+                                        completion = completion,
+                                        onClick = { onNavigateToCompletionDetail(completion.id) }
+                                    )
+                                }
+                            }
+
+                            // Loading more indicator
+                            if (uiState.isLoadingMore) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(AmakaSpacing.md.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            color = AmakaColors.accentBlue,
+                                            strokeWidth = 2.dp
+                                        )
+                                    }
+                                }
+                            }
+
+                            item {
+                                Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
+                            }
                         }
-                        items(completions) { completion ->
-                            CompletionListItem(
-                                completion = completion,
-                                onClick = { onNavigateToCompletionDetail(completion.id) }
-                            )
-                        }
-                    }
-                    item {
-                        Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
                     }
                 }
             }

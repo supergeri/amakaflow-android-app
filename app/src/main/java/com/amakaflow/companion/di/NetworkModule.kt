@@ -1,5 +1,6 @@
 package com.amakaflow.companion.di
 
+import android.util.Log
 import com.amakaflow.companion.BuildConfig
 import com.amakaflow.companion.data.AppEnvironment
 import com.amakaflow.companion.data.TestConfig
@@ -14,6 +15,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -22,7 +24,16 @@ import retrofit2.Retrofit
 import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Provider
+import javax.inject.Qualifier
 import javax.inject.Singleton
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class DynamicMapperUrl
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class DynamicIngestorUrl
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -37,10 +48,57 @@ object NetworkModule {
         isLenient = true
     }
 
+    /**
+     * Dynamic URL interceptor for Mapper API - reads AppEnvironment.current on each request
+     * This allows environment switching without app restart
+     */
+    @Provides
+    @Singleton
+    @DynamicMapperUrl
+    fun provideMapperUrlInterceptor(): Interceptor {
+        return Interceptor { chain ->
+            val originalRequest = chain.request()
+            val currentEnv = AppEnvironment.current
+            val targetUrl = currentEnv.mapperApiUrl
+            Log.d("NetworkModule", "Environment: $currentEnv, Target URL: $targetUrl")
+            val newUrl = originalRequest.url.newBuilder()
+                .scheme(targetUrl.toHttpUrl().scheme)
+                .host(targetUrl.toHttpUrl().host)
+                .port(targetUrl.toHttpUrl().port)
+                .build()
+            Log.d("NetworkModule", "Final URL: $newUrl")
+            val newRequest = originalRequest.newBuilder()
+                .url(newUrl)
+                .build()
+            chain.proceed(newRequest)
+        }
+    }
+
+    /**
+     * Dynamic URL interceptor for Ingestor API - reads AppEnvironment.current on each request
+     */
+    @Provides
+    @Singleton
+    @DynamicIngestorUrl
+    fun provideIngestorUrlInterceptor(): Interceptor {
+        return Interceptor { chain ->
+            val originalRequest = chain.request()
+            val newUrl = originalRequest.url.newBuilder()
+                .scheme(AppEnvironment.current.ingestorApiUrl.toHttpUrl().scheme)
+                .host(AppEnvironment.current.ingestorApiUrl.toHttpUrl().host)
+                .port(AppEnvironment.current.ingestorApiUrl.toHttpUrl().port)
+                .build()
+            val newRequest = originalRequest.newBuilder()
+                .url(newUrl)
+                .build()
+            chain.proceed(newRequest)
+        }
+    }
+
     @Provides
     @Singleton
     @Named("mapperBaseUrl")
-    fun provideMapperBaseUrl(): String = AppEnvironment.current.mapperApiUrl + "/"
+    fun provideMapperBaseUrl(): String = "https://placeholder.amakaflow.com/"
 
     @Provides
     @Singleton
@@ -98,19 +156,47 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(
-        authInterceptor: Interceptor,
-        authAuthenticator: AuthAuthenticator
-    ): OkHttpClient {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
+    fun provideLoggingInterceptor(): HttpLoggingInterceptor {
+        return HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.BODY
             } else {
                 HttpLoggingInterceptor.Level.NONE
             }
         }
+    }
 
+    @Provides
+    @Singleton
+    @Named("mapper")
+    fun provideMapperOkHttpClient(
+        authInterceptor: Interceptor,
+        authAuthenticator: AuthAuthenticator,
+        loggingInterceptor: HttpLoggingInterceptor,
+        @DynamicMapperUrl dynamicUrlInterceptor: Interceptor
+    ): OkHttpClient {
         return OkHttpClient.Builder()
+            .addInterceptor(dynamicUrlInterceptor)
+            .addInterceptor(authInterceptor)
+            .addInterceptor(loggingInterceptor)
+            .authenticator(authAuthenticator)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("ingestor")
+    fun provideIngestorOkHttpClient(
+        authInterceptor: Interceptor,
+        authAuthenticator: AuthAuthenticator,
+        loggingInterceptor: HttpLoggingInterceptor,
+        @DynamicIngestorUrl dynamicUrlInterceptor: Interceptor
+    ): OkHttpClient {
+        return OkHttpClient.Builder()
+            .addInterceptor(dynamicUrlInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(loggingInterceptor)
             .authenticator(authAuthenticator)
@@ -123,10 +209,11 @@ object NetworkModule {
     @Provides
     @Singleton
     @Named("mapper")
-    fun provideMapperRetrofit(okHttpClient: OkHttpClient, json: Json): Retrofit {
+    fun provideMapperRetrofit(@Named("mapper") okHttpClient: OkHttpClient, json: Json): Retrofit {
         val contentType = "application/json".toMediaType()
+        // Use placeholder URL - actual URL is set dynamically by DynamicMapperUrl interceptor
         return Retrofit.Builder()
-            .baseUrl(AppEnvironment.current.mapperApiUrl + "/")
+            .baseUrl("https://placeholder.amakaflow.com/")
             .client(okHttpClient)
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()
@@ -135,10 +222,11 @@ object NetworkModule {
     @Provides
     @Singleton
     @Named("ingestor")
-    fun provideIngestorRetrofit(okHttpClient: OkHttpClient, json: Json): Retrofit {
+    fun provideIngestorRetrofit(@Named("ingestor") okHttpClient: OkHttpClient, json: Json): Retrofit {
         val contentType = "application/json".toMediaType()
+        // Use placeholder URL - actual URL is set dynamically by DynamicIngestorUrl interceptor
         return Retrofit.Builder()
-            .baseUrl(AppEnvironment.current.ingestorApiUrl + "/")
+            .baseUrl("https://placeholder.amakaflow.com/")
             .client(okHttpClient)
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()

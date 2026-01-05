@@ -283,3 +283,22 @@ data class VoiceWorkoutResponse(
     @SerialName("raw_response")
     val rawResponse: String? = null
 )
+
+/**
+ * Completions list response wrapper
+ */
+@Serializable
+data class CompletionsResponse(
+    val success: Boolean,
+    val completions: List<WorkoutCompletion>,
+    val total: Int
+)
+
+/**
+ * Single completion detail response wrapper
+ */
+@Serializable
+data class CompletionDetailResponse(
+    val success: Boolean,
+    val completion: WorkoutCompletionDetail
+)

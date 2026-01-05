@@ -32,6 +32,7 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadData()
+        loadWeeklyStats()
         observeUserProfile()
     }
 
@@ -73,7 +74,22 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun loadWeeklyStats() {
+        viewModelScope.launch {
+            workoutRepository.getCompletions(limit = 50, offset = 0).collect { result ->
+                when (result) {
+                    is Result.Success -> {
+                        val weeklyStats = WeeklySummary.fromCompletions(result.data.completions)
+                        _uiState.update { it.copy(weeklyStats = weeklyStats) }
+                    }
+                    else -> { /* Keep default stats on error */ }
+                }
+            }
+        }
+    }
+
     fun refresh() {
         loadData()
+        loadWeeklyStats()
     }
 }

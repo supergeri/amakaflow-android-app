@@ -33,7 +33,7 @@ class SettingsViewModel @Inject constructor(
         observePairingState()
         _uiState.update {
             it.copy(
-                environment = AppEnvironment.current,
+                environment = testConfig.appEnvironment,  // Read persisted value
                 isTestModeEnabled = testConfig.isTestModeEnabled,
                 testUserEmail = testConfig.testUserEmail
             )
@@ -62,7 +62,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setEnvironment(environment: AppEnvironment) {
-        AppEnvironment.current = environment
+        testConfig.appEnvironment = environment  // Persists and sets AppEnvironment.current
         _uiState.update { it.copy(environment = environment) }
     }
 
