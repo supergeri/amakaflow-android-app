@@ -247,10 +247,11 @@ fun SettingsScreen(
                 onCopyToken = { /* Copy API token */ },
                 onRefreshToken = { /* Refresh token */ },
                 onViewErrorLog = onNavigateToErrorLog,
-                onCheckNow = { /* Check pending workouts */ },
+                onCheckNow = { viewModel.checkPendingWorkouts() },
                 onWorkoutDebug = onNavigateToWorkoutDebug,
                 errorCount = 0,
-                onEnvironmentClick = { showEnvironmentDialog = true }
+                onEnvironmentClick = { showEnvironmentDialog = true },
+                pendingWorkouts = uiState.pendingWorkouts
             )
         }
         item {
@@ -697,7 +698,8 @@ private fun AccountInfoCard(
     onCheckNow: () -> Unit,
     onWorkoutDebug: () -> Unit,
     errorCount: Int,
-    onEnvironmentClick: () -> Unit
+    onEnvironmentClick: () -> Unit,
+    pendingWorkouts: PendingWorkoutsState = PendingWorkoutsState()
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -837,12 +839,73 @@ private fun AccountInfoCard(
                     color = AmakaColors.textSecondary
                 )
             }
-            Text(
-                text = "No pending workouts",
-                style = MaterialTheme.typography.bodySmall,
-                color = AmakaColors.textTertiary,
-                modifier = Modifier.padding(start = 24.dp, top = 4.dp)
-            )
+
+            // Pending workouts content
+            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                when {
+                    pendingWorkouts.isLoading -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(12.dp),
+                                strokeWidth = 2.dp,
+                                color = AmakaColors.accentBlue
+                            )
+                            Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+                            Text(
+                                text = "Checking...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AmakaColors.textTertiary
+                            )
+                        }
+                    }
+                    pendingWorkouts.error != null -> {
+                        Text(
+                            text = "Error: ${pendingWorkouts.error}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AmakaColors.accentRed
+                        )
+                    }
+                    pendingWorkouts.workouts.isEmpty() -> {
+                        Text(
+                            text = "No pending workouts",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AmakaColors.textTertiary
+                        )
+                    }
+                    else -> {
+                        Text(
+                            text = "Found ${pendingWorkouts.workouts.size} workout(s)",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = AmakaColors.textPrimary
+                        )
+                        pendingWorkouts.workouts.firstOrNull()?.let { workout ->
+                            Text(
+                                text = "First: ${workout.name}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AmakaColors.textSecondary
+                            )
+                        }
+                        if (pendingWorkouts.isSynced) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = null,
+                                    tint = AmakaColors.accentGreen,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Synced!",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AmakaColors.accentGreen
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
 

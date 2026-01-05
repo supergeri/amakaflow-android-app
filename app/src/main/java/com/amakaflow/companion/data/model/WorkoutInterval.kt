@@ -150,3 +150,41 @@ object WorkoutIntervalSerializer : KSerializer<WorkoutInterval> {
         }
     }
 }
+
+/**
+ * Convert a WorkoutInterval to a simplified submission format
+ */
+fun WorkoutInterval.toSubmissionInterval(): WorkoutIntervalSubmission {
+    return when (this) {
+        is WorkoutInterval.Warmup -> WorkoutIntervalSubmission(
+            type = "warmup",
+            seconds = seconds,
+            target = target
+        )
+        is WorkoutInterval.Cooldown -> WorkoutIntervalSubmission(
+            type = "cooldown",
+            seconds = seconds,
+            target = target
+        )
+        is WorkoutInterval.Time -> WorkoutIntervalSubmission(
+            type = "time",
+            seconds = seconds,
+            target = target
+        )
+        is WorkoutInterval.Reps -> WorkoutIntervalSubmission(
+            type = "reps",
+            reps = reps,
+            sets = sets,
+            name = name
+        )
+        is WorkoutInterval.Distance -> WorkoutIntervalSubmission(
+            type = "distance",
+            seconds = null,
+            target = target
+        )
+        is WorkoutInterval.Repeat -> WorkoutIntervalSubmission(
+            type = "repeat",
+            reps = reps
+        )
+    }
+}

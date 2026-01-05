@@ -37,6 +37,7 @@ import com.amakaflow.companion.ui.screens.history.HistoryScreen
 import com.amakaflow.companion.ui.screens.home.HomeScreen
 import com.amakaflow.companion.ui.screens.more.MoreScreen
 import com.amakaflow.companion.ui.screens.pairing.PairingScreen
+import com.amakaflow.companion.ui.screens.player.WorkoutPlayerScreen
 import com.amakaflow.companion.ui.screens.settings.SettingsScreen
 import com.amakaflow.companion.ui.screens.settings.SettingsViewModel
 import com.amakaflow.companion.ui.screens.settings.TranscriptionSettingsScreen
@@ -225,7 +226,20 @@ fun MainScreen(testConfig: TestConfig) {
                 WorkoutDetailScreen(
                     workoutId = workoutId,
                     onNavigateBack = { navController.popBackStack() },
-                    onStartWorkout = { /* Navigate to workout player */ }
+                    onStartWorkout = {
+                        navController.navigate(Screen.WorkoutPlayer.createRoute(workoutId))
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.WorkoutPlayer.route,
+                arguments = listOf(navArgument("workoutId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val workoutId = backStackEntry.arguments?.getString("workoutId") ?: return@composable
+                WorkoutPlayerScreen(
+                    workoutId = workoutId,
+                    onDismiss = { navController.popBackStack() }
                 )
             }
 
@@ -318,7 +332,10 @@ fun MainScreen(testConfig: TestConfig) {
                 val completionId = backStackEntry.arguments?.getString("completionId") ?: return@composable
                 CompletionDetailScreen(
                     completionId = completionId,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onRunAgain = { workoutId ->
+                        navController.navigate(Screen.WorkoutPlayer.createRoute(workoutId))
+                    }
                 )
             }
 

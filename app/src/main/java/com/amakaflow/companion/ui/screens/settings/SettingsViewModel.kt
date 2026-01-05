@@ -1,15 +1,28 @@
 package com.amakaflow.companion.ui.screens.settings
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amakaflow.companion.BuildConfig
 import com.amakaflow.companion.data.AppEnvironment
 import com.amakaflow.companion.data.TestConfig
+import com.amakaflow.companion.data.model.Workout
 import com.amakaflow.companion.data.repository.PairingRepository
+import com.amakaflow.companion.data.repository.WorkoutRepository
+import com.amakaflow.companion.data.repository.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val TAG = "SettingsViewModel"
+
+data class PendingWorkoutsState(
+    val isLoading: Boolean = false,
+    val workouts: List<Workout> = emptyList(),
+    val error: String? = null,
+    val isSynced: Boolean = false
+)
 
 data class SettingsUiState(
     val isPaired: Boolean = false,
@@ -17,12 +30,14 @@ data class SettingsUiState(
     val environment: AppEnvironment = AppEnvironment.PRODUCTION,
     val appVersion: String = BuildConfig.VERSION_NAME,
     val isTestModeEnabled: Boolean = false,
-    val testUserEmail: String? = null
+    val testUserEmail: String? = null,
+    val pendingWorkouts: PendingWorkoutsState = PendingWorkoutsState()
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val pairingRepository: PairingRepository,
+    private val workoutRepository: WorkoutRepository,
     private val testConfig: TestConfig
 ) : ViewModel() {
 
@@ -38,6 +53,8 @@ class SettingsViewModel @Inject constructor(
                 testUserEmail = testConfig.testUserEmail
             )
         }
+        // Auto-check pending workouts on init
+        checkPendingWorkouts()
     }
 
     private fun observePairingState() {
@@ -94,6 +111,56 @@ class SettingsViewModel @Inject constructor(
         pairingRepository.unpair()
         if (testConfig.isTestModeEnabled) {
             disableTestMode()
+        }
+    }
+
+    fun checkPendingWorkouts() {
+        Log.d(TAG, "checkPendingWorkouts: Starting check, environment=${AppEnvironment.current.displayName}, url=${AppEnvironment.current.mapperApiUrl}")
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(pendingWorkouts = it.pendingWorkouts.copy(isLoading = true, error = null))
+            }
+
+            workoutRepository.getPushedWorkouts().collect { result ->
+                Log.d(TAG, "checkPendingWorkouts: Got result: $result")
+                when (result) {
+                    is Result.Loading -> {
+                        Log.d(TAG, "checkPendingWorkouts: Loading...")
+                        _uiState.update {
+                            it.copy(pendingWorkouts = it.pendingWorkouts.copy(isLoading = true))
+                        }
+                    }
+                    is Result.Success -> {
+                        Log.d(TAG, "checkPendingWorkouts: Success! Found ${result.data.size} workouts")
+                        result.data.forEach { workout ->
+                            Log.d(TAG, "  - ${workout.name} (${workout.id})")
+                        }
+                        _uiState.update {
+                            it.copy(
+                                pendingWorkouts = PendingWorkoutsState(
+                                    isLoading = false,
+                                    workouts = result.data,
+                                    isSynced = true,
+                                    error = null
+                                )
+                            )
+                        }
+                    }
+                    is Result.Error -> {
+                        Log.e(TAG, "checkPendingWorkouts: Error - ${result.message}")
+                        _uiState.update {
+                            it.copy(
+                                pendingWorkouts = PendingWorkoutsState(
+                                    isLoading = false,
+                                    workouts = emptyList(),
+                                    isSynced = false,
+                                    error = result.message
+                                )
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

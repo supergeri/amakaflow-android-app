@@ -32,18 +32,19 @@ interface AmakaflowApi {
     suspend fun getScheduledWorkouts(): Response<List<ScheduledWorkout>>
 
     /**
-     * Fetch workouts pushed to this device
+     * Fetch workouts pushed to Android Companion App
      */
-    @GET("workouts/pushed")
+    @GET("android-companion/pending")
     suspend fun getPushedWorkouts(
-        @Query("device") device: String = "android-companion"
-    ): Response<List<Workout>>
+        @Query("limit") limit: Int = 50,
+        @Query("exclude_completed") excludeCompleted: Boolean = true
+    ): Response<PushedWorkoutsResponse>
 
     /**
      * Get a specific workout by ID
      */
     @GET("workouts/{id}")
-    suspend fun getWorkout(@Path("id") id: String): Response<Workout>
+    suspend fun getWorkout(@Path("id") id: String): Response<WorkoutResponse>
 
     // MARK: - Workout Completions (History)
 

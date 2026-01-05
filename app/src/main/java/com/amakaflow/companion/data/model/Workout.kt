@@ -6,15 +6,15 @@ import kotlinx.serialization.Serializable
 /**
  * Workout sport types
  */
-@Serializable
+@Serializable(with = WorkoutSportSerializer::class)
 enum class WorkoutSport {
-    @SerialName("running") RUNNING,
-    @SerialName("cycling") CYCLING,
-    @SerialName("strength") STRENGTH,
-    @SerialName("mobility") MOBILITY,
-    @SerialName("swimming") SWIMMING,
-    @SerialName("cardio") CARDIO,
-    @SerialName("other") OTHER;
+    RUNNING,
+    CYCLING,
+    STRENGTH,
+    MOBILITY,
+    SWIMMING,
+    CARDIO,
+    OTHER;
 
     companion object {
         fun fromString(value: String): WorkoutSport {
@@ -28,21 +28,95 @@ enum class WorkoutSport {
                 else -> OTHER
             }
         }
+
+        fun toApiString(sport: WorkoutSport): String {
+            return when (sport) {
+                RUNNING -> "running"
+                CYCLING -> "cycling"
+                STRENGTH -> "strength"
+                MOBILITY -> "mobility"
+                SWIMMING -> "swimming"
+                CARDIO -> "cardio"
+                OTHER -> "other"
+            }
+        }
+    }
+}
+
+/**
+ * Custom serializer for WorkoutSport that handles multiple API values
+ */
+object WorkoutSportSerializer : kotlinx.serialization.KSerializer<WorkoutSport> {
+    override val descriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+        "WorkoutSport",
+        kotlinx.serialization.descriptors.PrimitiveKind.STRING
+    )
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: WorkoutSport) {
+        encoder.encodeString(WorkoutSport.toApiString(value))
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): WorkoutSport {
+        return WorkoutSport.fromString(decoder.decodeString())
     }
 }
 
 /**
  * Workout source types
  */
-@Serializable
+@Serializable(with = WorkoutSourceSerializer::class)
 enum class WorkoutSource {
-    @SerialName("instagram") INSTAGRAM,
-    @SerialName("youtube") YOUTUBE,
-    @SerialName("image") IMAGE,
-    @SerialName("ai") AI,
-    @SerialName("coach") COACH,
-    @SerialName("amaka") AMAKA,
-    @SerialName("other") OTHER
+    INSTAGRAM,
+    YOUTUBE,
+    IMAGE,
+    AI,
+    COACH,
+    AMAKA,
+    OTHER;
+
+    companion object {
+        fun fromString(value: String): WorkoutSource {
+            return when (value.lowercase()) {
+                "instagram" -> INSTAGRAM
+                "youtube" -> YOUTUBE
+                "image" -> IMAGE
+                "ai" -> AI
+                "coach" -> COACH
+                "amaka", "amakaflow" -> AMAKA
+                else -> OTHER
+            }
+        }
+
+        fun toApiString(source: WorkoutSource): String {
+            return when (source) {
+                INSTAGRAM -> "instagram"
+                YOUTUBE -> "youtube"
+                IMAGE -> "image"
+                AI -> "ai"
+                COACH -> "coach"
+                AMAKA -> "amaka"
+                OTHER -> "other"
+            }
+        }
+    }
+}
+
+/**
+ * Custom serializer for WorkoutSource that handles multiple API values
+ */
+object WorkoutSourceSerializer : kotlinx.serialization.KSerializer<WorkoutSource> {
+    override val descriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+        "WorkoutSource",
+        kotlinx.serialization.descriptors.PrimitiveKind.STRING
+    )
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: WorkoutSource) {
+        encoder.encodeString(WorkoutSource.toApiString(value))
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): WorkoutSource {
+        return WorkoutSource.fromString(decoder.decodeString())
+    }
 }
 
 /**

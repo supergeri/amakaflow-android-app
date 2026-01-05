@@ -46,7 +46,8 @@ class HomeViewModel @Inject constructor(
 
     private fun loadData() {
         viewModelScope.launch {
-            workoutRepository.getIncomingWorkouts().collect { result ->
+            // Load pushed workouts from android-companion endpoint
+            workoutRepository.getPushedWorkouts().collect { result ->
                 when (result) {
                     is Result.Loading -> {
                         _uiState.update { it.copy(isLoading = true, error = null) }
@@ -55,8 +56,8 @@ class HomeViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
+                                todayWorkouts = result.data,
                                 upcomingWorkouts = result.data,
-                                todayWorkouts = result.data.take(2), // Mock today's workouts
                                 error = null
                             )
                         }

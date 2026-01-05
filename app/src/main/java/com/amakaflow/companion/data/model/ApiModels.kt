@@ -112,7 +112,7 @@ data class HealthMetrics(
 )
 
 /**
- * Workout completion submission
+ * Workout completion submission - matches iOS WorkoutCompletionRequest structure
  */
 @Serializable
 data class WorkoutCompletionSubmission(
@@ -124,19 +124,9 @@ data class WorkoutCompletionSubmission(
     val startedAt: Instant,
     @SerialName("ended_at")
     val endedAt: Instant? = null,
-    @SerialName("duration_seconds")
-    val durationSeconds: Int,
     val source: CompletionSource,
-    @SerialName("avg_heart_rate")
-    val avgHeartRate: Int? = null,
-    @SerialName("max_heart_rate")
-    val maxHeartRate: Int? = null,
-    @SerialName("min_heart_rate")
-    val minHeartRate: Int? = null,
-    @SerialName("active_calories")
-    val activeCalories: Int? = null,
-    @SerialName("total_calories")
-    val totalCalories: Int? = null,
+    @SerialName("health_metrics")
+    val healthMetrics: HealthMetrics,
     @SerialName("device_info")
     val deviceInfo: CompletionDeviceInfo? = null,
     @SerialName("workout_structure")
@@ -234,7 +224,7 @@ data class WorkoutCompletionDetail(
     @SerialName("workout_id")
     val workoutId: String? = null,
     @SerialName("workout_structure")
-    val workoutStructure: List<WorkoutInterval>? = null
+    val workoutStructure: List<WorkoutIntervalSubmission>? = null
 ) {
     val resolvedEndedAt: Instant
         get() = endedAt ?: (startedAt + kotlin.time.Duration.parse("${durationSeconds}s"))
@@ -301,4 +291,24 @@ data class CompletionsResponse(
 data class CompletionDetailResponse(
     val success: Boolean,
     val completion: WorkoutCompletionDetail
+)
+
+/**
+ * Pushed workouts response wrapper
+ */
+@Serializable
+data class PushedWorkoutsResponse(
+    val success: Boolean,
+    val workouts: List<Workout> = emptyList(),
+    val message: String? = null
+)
+
+/**
+ * Single workout response wrapper
+ */
+@Serializable
+data class WorkoutResponse(
+    val success: Boolean,
+    val workout: Workout? = null,
+    val message: String? = null
 )
