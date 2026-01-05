@@ -36,6 +36,6 @@ enum class AppEnvironment {
         }
 
     companion object {
-        var current: AppEnvironment = PRODUCTION
+        var current: AppEnvironment = valueOf(BuildConfig.DEFAULT_ENVIRONMENT)
     }
 }
