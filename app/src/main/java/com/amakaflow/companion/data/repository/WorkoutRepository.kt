@@ -53,15 +53,20 @@ class WorkoutRepository @Inject constructor(
         DebugLog.info("Fetching incoming workouts...", TAG)
         try {
             val response = api.getIncomingWorkouts()
-            if (response.isSuccessful) {
-                val workouts = response.body() ?: emptyList()
-                // Cache workouts for later lookup by ID
-                cacheWorkouts(workouts)
-                DebugLog.success("Fetched ${workouts.size} incoming workout(s)", TAG)
-                emit(Result.Success(workouts))
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                if (body.success) {
+                    // Cache workouts for later lookup by ID
+                    cacheWorkouts(body.workouts)
+                    DebugLog.success("Fetched ${body.workouts.size} incoming workout(s)", TAG)
+                    emit(Result.Success(body.workouts))
+                } else {
+                    DebugLog.error("Failed to load incoming workouts: ${body.message}", TAG)
+                    emit(Result.Error(body.message ?: "Failed to load incoming workouts", response.code()))
+                }
             } else {
                 DebugLog.error("Failed to load incoming workouts: ${response.code()}", TAG)
-                emit(Result.Error("Failed to load workouts", response.code()))
+                emit(Result.Error("Failed to load incoming workouts", response.code()))
             }
         } catch (e: Exception) {
             DebugLog.error("Exception fetching incoming workouts: ${e.message}", TAG)

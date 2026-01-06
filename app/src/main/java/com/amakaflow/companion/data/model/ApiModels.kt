@@ -88,7 +88,10 @@ data class ApiErrorResponse(
  */
 @Serializable
 data class IncomingWorkoutsResponse(
-    val workouts: List<Workout>
+    val success: Boolean,
+    val workouts: List<Workout> = emptyList(),
+    val count: Int? = null,
+    val message: String? = null
 )
 
 /**

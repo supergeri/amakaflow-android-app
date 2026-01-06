@@ -23,7 +23,7 @@ interface AmakaflowApi {
      * Fetch workouts from connected calendars
      */
     @GET("workouts/incoming")
-    suspend fun getIncomingWorkouts(): Response<List<Workout>>
+    suspend fun getIncomingWorkouts(): Response<IncomingWorkoutsResponse>
 
     /**
      * Fetch scheduled workouts
