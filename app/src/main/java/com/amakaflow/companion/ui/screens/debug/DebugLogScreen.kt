@@ -2,12 +2,10 @@ package com.amakaflow.companion.ui.screens.debug
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
@@ -21,11 +19,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amakaflow.companion.debug.DebugLog
+import com.amakaflow.companion.debug.ErrorType
 import com.amakaflow.companion.debug.LogEntry
 import com.amakaflow.companion.debug.LogLevel
 import com.amakaflow.companion.ui.theme.AmakaColors
@@ -40,13 +39,6 @@ fun DebugLogScreen(
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     val listState = rememberLazyListState()
-
-    // Auto-scroll to bottom when new entries are added
-    LaunchedEffect(entries.size) {
-        if (entries.isNotEmpty()) {
-            listState.animateScrollToItem(entries.size - 1)
-        }
-    }
 
     Column(
         modifier = Modifier
@@ -64,7 +56,7 @@ fun DebugLogScreen(
             Spacer(modifier = Modifier.width(60.dp)) // Balance for centering
 
             Text(
-                text = "Debug Logs",
+                text = "Debug Log",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = AmakaColors.textPrimary
@@ -176,11 +168,11 @@ fun DebugLogScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = AmakaSpacing.sm.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                contentPadding = PaddingValues(horizontal = AmakaSpacing.md.dp),
+                verticalArrangement = Arrangement.spacedBy(AmakaSpacing.sm.dp)
             ) {
                 items(entries, key = { it.id }) { entry ->
-                    LogEntryRow(entry = entry)
+                    LogEntryCard(entry = entry)
                 }
                 item {
                     Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
@@ -191,38 +183,148 @@ fun DebugLogScreen(
 }
 
 @Composable
-private fun LogEntryRow(entry: LogEntry) {
-    val backgroundColor = when (entry.level) {
-        LogLevel.ERROR -> AmakaColors.accentRed.copy(alpha = 0.15f)
-        LogLevel.WARNING -> AmakaColors.accentOrange.copy(alpha = 0.15f)
-        LogLevel.SUCCESS -> AmakaColors.accentGreen.copy(alpha = 0.15f)
-        LogLevel.DEBUG -> AmakaColors.textTertiary.copy(alpha = 0.1f)
-        LogLevel.INFO -> Color.Transparent
+private fun LogEntryCard(entry: LogEntry) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = AmakaColors.surface,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(AmakaSpacing.md.dp)
+        ) {
+            // Top row: Error type badge + timestamp
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Error type badge
+                ErrorTypeBadge(
+                    errorType = entry.errorType,
+                    level = entry.level
+                )
+
+                // Timestamp
+                Text(
+                    text = entry.formattedDateTime(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AmakaColors.textTertiary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Title
+            Text(
+                text = entry.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = AmakaColors.textPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            // Details (if present)
+            entry.details?.let { details ->
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = details,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AmakaColors.textSecondary,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // API-specific details (if present)
+            if (entry.endpoint != null || entry.method != null || entry.statusCode != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                ApiDetailsSection(entry = entry)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ErrorTypeBadge(
+    errorType: ErrorType,
+    level: LogLevel
+) {
+    val (backgroundColor, textColor) = when (errorType) {
+        ErrorType.API_ERROR -> AmakaColors.accentRed to Color.White
+        ErrorType.WATCH_ERROR -> AmakaColors.accentOrange to Color.White
+        ErrorType.NETWORK_ERROR -> AmakaColors.accentOrange to Color.White
+        ErrorType.AUTH_ERROR -> Color(0xFF9C27B0) to Color.White // Purple
+        ErrorType.SYNC_ERROR -> AmakaColors.accentBlue to Color.White
+        ErrorType.APP_ERROR -> AmakaColors.accentRed to Color.White
+        ErrorType.GENERAL -> when (level) {
+            LogLevel.SUCCESS -> AmakaColors.accentGreen to Color.White
+            LogLevel.WARNING -> AmakaColors.accentOrange to Color.White
+            LogLevel.ERROR -> AmakaColors.accentRed to Color.White
+            LogLevel.DEBUG -> AmakaColors.textTertiary to AmakaColors.textPrimary
+            LogLevel.INFO -> AmakaColors.accentBlue.copy(alpha = 0.3f) to AmakaColors.textPrimary
+        }
     }
 
-    val textColor = when (entry.level) {
-        LogLevel.ERROR -> AmakaColors.accentRed
-        LogLevel.WARNING -> AmakaColors.accentOrange
-        LogLevel.SUCCESS -> AmakaColors.accentGreen
-        LogLevel.DEBUG -> AmakaColors.textTertiary
-        LogLevel.INFO -> AmakaColors.textSecondary
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(backgroundColor, RoundedCornerShape(4.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+    Surface(
+        color = backgroundColor,
+        shape = RoundedCornerShape(4.dp)
     ) {
         Text(
-            text = entry.formatted(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            fontFamily = FontFamily.Monospace,
-            fontSize = 11.sp,
+            text = errorType.displayName,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
             color = textColor,
-            maxLines = 10
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            fontSize = 10.sp
+        )
+    }
+}
+
+@Composable
+private fun ApiDetailsSection(entry: LogEntry) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                AmakaColors.background.copy(alpha = 0.5f),
+                RoundedCornerShape(4.dp)
+            )
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        entry.endpoint?.let { endpoint ->
+            ApiDetailRow(label = "Endpoint", value = endpoint)
+        }
+        entry.method?.let { method ->
+            ApiDetailRow(label = "Method", value = method)
+        }
+        entry.statusCode?.let { statusCode ->
+            ApiDetailRow(label = "Status", value = statusCode.toString())
+        }
+        entry.response?.let { response ->
+            ApiDetailRow(label = "Response", value = response)
+        }
+    }
+}
+
+@Composable
+private fun ApiDetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = "$label: ",
+            style = MaterialTheme.typography.labelSmall,
+            color = AmakaColors.textTertiary,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelSmall,
+            color = AmakaColors.textSecondary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
