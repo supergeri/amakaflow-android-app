@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [PendingCompletionEntity::class],
-    version = 2,
+    version = 3,  // Added is_simulated column
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

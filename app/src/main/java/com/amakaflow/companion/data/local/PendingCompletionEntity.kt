@@ -32,6 +32,8 @@ data class PendingCompletionEntity(
     val deviceInfoJson: String?,
     @ColumnInfo(name = "workout_structure_json")
     val workoutStructureJson: String?,
+    @ColumnInfo(name = "is_simulated", defaultValue = "0")
+    val isSimulated: Boolean = false,
     @ColumnInfo(name = "retry_count")
     val retryCount: Int = 0,
     @ColumnInfo(name = "last_error")

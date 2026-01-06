@@ -7,6 +7,7 @@ import com.amakaflow.companion.data.model.*
 import com.amakaflow.companion.data.repository.Result
 import com.amakaflow.companion.data.repository.WorkoutRepository
 import com.amakaflow.companion.debug.DebugLog
+import com.amakaflow.companion.simulation.SimulationSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -90,6 +91,7 @@ data class WorkoutPlayerUiState(
 @HiltViewModel
 class WorkoutPlayerViewModel @Inject constructor(
     private val workoutRepository: WorkoutRepository,
+    private val simulationSettings: SimulationSettings,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -426,7 +428,8 @@ class WorkoutPlayerViewModel @Inject constructor(
                         distanceMeters = null,
                         steps = null
                     ),
-                    workoutStructure = intervals?.map { it.toSubmissionInterval() }
+                    workoutStructure = intervals?.map { it.toSubmissionInterval() },
+                    isSimulated = simulationSettings.isEnabledSync()
                 )
                 val result = workoutRepository.completeWorkout(submission)
                 when (result) {
