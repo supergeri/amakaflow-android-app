@@ -200,7 +200,8 @@ fun WorkoutInterval.toSubmissionInterval(): WorkoutIntervalSubmission {
         )
         is WorkoutInterval.Repeat -> WorkoutIntervalSubmission(
             type = "repeat",
-            reps = reps
+            reps = reps,
+            intervals = intervals.map { it.toSubmissionInterval() }
         )
         is WorkoutInterval.Rest -> WorkoutIntervalSubmission(
             type = "rest",

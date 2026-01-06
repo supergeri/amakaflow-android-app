@@ -469,12 +469,34 @@ private fun CompletionDetailContent(
 }
 
 /**
- * Flattens nested workout intervals into a simple list for display
- * WorkoutIntervalSubmission with type="repeat" contains reps count but not nested intervals,
- * so we just filter out repeat types as they're metadata only
+ * Flattens nested workout intervals into a simple list for display.
+ * Expands repeat blocks to show their nested intervals.
+ * Filters out rest intervals as they are metadata between steps, not displayable steps.
  */
 private fun flattenWorkoutIntervals(intervals: List<WorkoutIntervalSubmission>): List<WorkoutIntervalSubmission> {
-    return intervals.filter { it.type != "repeat" }
+    val result = mutableListOf<WorkoutIntervalSubmission>()
+    flattenRecursive(intervals, result)
+    return result
+}
+
+private fun flattenRecursive(intervals: List<WorkoutIntervalSubmission>, result: MutableList<WorkoutIntervalSubmission>) {
+    for (interval in intervals) {
+        when {
+            interval.type == "repeat" -> {
+                // Expand nested intervals recursively (skip if no nested intervals)
+                if (!interval.intervals.isNullOrEmpty()) {
+                    flattenRecursive(interval.intervals, result)
+                }
+                // Skip repeat blocks without nested intervals - they're just metadata
+            }
+            interval.type == "rest" -> {
+                // Skip rest intervals - they are between-step metadata
+            }
+            else -> {
+                result.add(interval)
+            }
+        }
+    }
 }
 
 /**
