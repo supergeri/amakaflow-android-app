@@ -1,12 +1,12 @@
 package com.amakaflow.companion.ui.screens.player
 
-import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amakaflow.companion.data.model.*
 import com.amakaflow.companion.data.repository.Result
 import com.amakaflow.companion.data.repository.WorkoutRepository
+import com.amakaflow.companion.debug.DebugLog
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -16,6 +16,8 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import javax.inject.Inject
+
+private const val TAG = "Workout"
 
 data class WorkoutPlayerUiState(
     val isLoading: Boolean = true,
@@ -104,6 +106,7 @@ class WorkoutPlayerViewModel @Inject constructor(
     }
 
     private fun loadWorkout() {
+        DebugLog.info("Loading workout: $workoutId", TAG)
         viewModelScope.launch {
             workoutRepository.getWorkout(workoutId).collect { result ->
                 when (result) {
@@ -113,6 +116,7 @@ class WorkoutPlayerViewModel @Inject constructor(
                     is Result.Success -> {
                         val workout = result.data
                         val flattenedSteps = IntervalFlattener.flatten(workout.intervals)
+                        DebugLog.success("Loaded workout: ${workout.name} (${flattenedSteps.size} steps)", TAG)
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
@@ -125,6 +129,7 @@ class WorkoutPlayerViewModel @Inject constructor(
                         start()
                     }
                     is Result.Error -> {
+                        DebugLog.error("Failed to load workout: ${result.message}", TAG)
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
@@ -141,6 +146,7 @@ class WorkoutPlayerViewModel @Inject constructor(
         val currentState = _uiState.value
         if (currentState.flattenedSteps.isEmpty()) return
 
+        DebugLog.info("Starting workout: ${currentState.workout?.name}", TAG)
         timerJob?.cancel()
         workoutStartTime = Clock.System.now()
 
@@ -158,12 +164,14 @@ class WorkoutPlayerViewModel @Inject constructor(
 
     fun pause() {
         if (_uiState.value.phase != WorkoutPhase.RUNNING) return
+        DebugLog.debug("Workout paused", TAG)
         _uiState.update { it.copy(phase = WorkoutPhase.PAUSED) }
         timerJob?.cancel()
     }
 
     fun resume() {
         if (_uiState.value.phase != WorkoutPhase.PAUSED) return
+        DebugLog.debug("Workout resumed", TAG)
         _uiState.update { it.copy(phase = WorkoutPhase.RUNNING) }
         startTimer()
     }
@@ -227,6 +235,8 @@ class WorkoutPlayerViewModel @Inject constructor(
 
     fun end(reason: EndReason) {
         val currentState = _uiState.value
+        DebugLog.info("Ending workout: reason=$reason, elapsed=${currentState.elapsedSeconds}s", TAG)
+
         val workoutData = Triple(
             currentState.workout?.id,
             currentState.workout?.name,
@@ -245,6 +255,7 @@ class WorkoutPlayerViewModel @Inject constructor(
 
         // Post completion to API if completed or user ended
         if (reason == EndReason.COMPLETED || reason == EndReason.USER_ENDED) {
+            DebugLog.info("Posting workout completion...", TAG)
             postWorkoutCompletion(
                 workoutId = workoutData.first,
                 workoutName = workoutData.second,
@@ -252,6 +263,8 @@ class WorkoutPlayerViewModel @Inject constructor(
                 durationSeconds = duration,
                 intervals = intervals
             )
+        } else {
+            DebugLog.debug("Workout discarded, not posting completion", TAG)
         }
     }
 
@@ -418,15 +431,16 @@ class WorkoutPlayerViewModel @Inject constructor(
                 val result = workoutRepository.completeWorkout(submission)
                 when (result) {
                     is Result.Success -> {
-                        Log.d("WorkoutPlayer", "Completion posted successfully: ${result.data.id}")
+                        DebugLog.success("Workout completion posted: ${result.data.id}", TAG)
                     }
                     is Result.Error -> {
-                        Log.e("WorkoutPlayer", "Failed to post completion: ${result.message}")
+                        DebugLog.error("Failed to post completion: ${result.message}", TAG)
                     }
                     is Result.Loading -> {}
                 }
             } catch (e: Exception) {
-                Log.e("WorkoutPlayer", "Failed to post completion", e)
+                DebugLog.error("Exception posting completion: ${e.message}", TAG)
+                DebugLog.error(e, TAG)
             }
         }
     }

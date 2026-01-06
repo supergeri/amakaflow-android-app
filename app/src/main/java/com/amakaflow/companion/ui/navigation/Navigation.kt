@@ -31,6 +31,7 @@ import androidx.navigation.navArgument
 import com.amakaflow.companion.data.TestConfig
 import com.amakaflow.companion.ui.screens.calendar.CalendarScreen
 import com.amakaflow.companion.ui.screens.completion.CompletionDetailScreen
+import com.amakaflow.companion.ui.screens.debug.DebugLogScreen
 import com.amakaflow.companion.ui.screens.debug.ErrorLogScreen
 import com.amakaflow.companion.ui.screens.debug.WorkoutDebugScreen
 import com.amakaflow.companion.ui.screens.history.HistoryScreen
@@ -66,6 +67,7 @@ sealed class Screen(val route: String) {
     }
     data object WorkoutDebug : Screen("workout_debug")
     data object ErrorLog : Screen("error_log")
+    data object DebugLog : Screen("debug_log")
     data object TranscriptionSettings : Screen("transcription_settings")
     data object VoiceWorkout : Screen("voice_workout")
     data object CompletionDetail : Screen("completion/{completionId}") {
@@ -292,8 +294,8 @@ fun MainScreen(testConfig: TestConfig) {
                     onNavigateToWorkoutDebug = {
                         navController.navigate(Screen.WorkoutDebug.route)
                     },
-                    onNavigateToErrorLog = {
-                        navController.navigate(Screen.ErrorLog.route)
+                    onNavigateToDebugLog = {
+                        navController.navigate(Screen.DebugLog.route)
                     },
                     onNavigateToTranscriptionSettings = {
                         navController.navigate(Screen.TranscriptionSettings.route)
@@ -309,6 +311,12 @@ fun MainScreen(testConfig: TestConfig) {
 
             composable(Screen.ErrorLog.route) {
                 ErrorLogScreen(
+                    onDismiss = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.DebugLog.route) {
+                DebugLogScreen(
                     onDismiss = { navController.popBackStack() }
                 )
             }

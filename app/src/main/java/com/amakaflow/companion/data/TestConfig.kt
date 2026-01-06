@@ -26,7 +26,7 @@ class TestConfig @Inject constructor(
         private const val KEY_APP_ENVIRONMENT = "app_environment"
 
         // Default test credentials for e2e testing
-        const val DEFAULT_TEST_USER_EMAIL = "soopergeri+e2etest@gmail.com"
+        const val DEFAULT_TEST_USER_EMAIL = "soopergeri+e2e-android@gmail.com"
     }
 
     var isTestModeEnabled: Boolean
