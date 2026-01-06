@@ -305,7 +305,7 @@ private fun CompletionDetailContent(
             }
         }
 
-        // Workout Steps section (like iOS - AMA-224)
+        // Workout Breakdown section (hierarchical like web app - AMA-264)
         val workoutSteps = completion.workoutStructure
         if (!workoutSteps.isNullOrEmpty()) {
             item {
@@ -316,21 +316,20 @@ private fun CompletionDetailContent(
                 ) {
                     Column(modifier = Modifier.padding(AmakaSpacing.md.dp)) {
                         Text(
-                            text = "Workout Steps",
+                            text = "Workout Breakdown",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = AmakaColors.textPrimary
                         )
                         Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
 
-                        // Flatten and display steps
-                        val flattenedSteps = flattenWorkoutIntervals(workoutSteps)
-                        flattenedSteps.forEachIndexed { index, step ->
-                            WorkoutStepRow(
+                        // Display hierarchical workout structure (like web app)
+                        workoutSteps.forEachIndexed { index, interval ->
+                            WorkoutIntervalRow(
                                 stepNumber = index + 1,
-                                step = step
+                                interval = interval
                             )
-                            if (index < flattenedSteps.size - 1) {
+                            if (index < workoutSteps.size - 1) {
                                 Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
                             }
                         }
@@ -469,71 +468,135 @@ private fun CompletionDetailContent(
 }
 
 /**
- * Flattens nested workout intervals into a simple list for display.
- * Expands repeat blocks to show their nested intervals.
- * Filters out rest intervals as they are metadata between steps, not displayable steps.
+ * Display a workout interval row with hierarchical support.
+ * Handles repeat blocks with nested content, showing them like the web app.
  */
-private fun flattenWorkoutIntervals(intervals: List<WorkoutIntervalSubmission>): List<WorkoutIntervalSubmission> {
-    val result = mutableListOf<WorkoutIntervalSubmission>()
-    flattenRecursive(intervals, result)
-    return result
+@Composable
+private fun WorkoutIntervalRow(stepNumber: Int, interval: WorkoutIntervalSubmission) {
+    when (interval.type.lowercase()) {
+        "repeat" -> {
+            // Display repeat block with nested content (like web app)
+            RepeatBlockRow(stepNumber = stepNumber, repeat = interval)
+        }
+        else -> {
+            // Display single interval
+            SingleIntervalRow(stepNumber = stepNumber, interval = interval)
+        }
+    }
 }
 
-private fun flattenRecursive(intervals: List<WorkoutIntervalSubmission>, result: MutableList<WorkoutIntervalSubmission>) {
-    for (interval in intervals) {
-        when {
-            interval.type == "repeat" -> {
-                // Expand nested intervals recursively (skip if no nested intervals)
-                if (!interval.intervals.isNullOrEmpty()) {
-                    flattenRecursive(interval.intervals, result)
+/**
+ * Display a repeat block with its nested intervals (like web app).
+ * Shows: "Repeat [n] - [sets] sets" with nested exercise and rest steps indented.
+ */
+@Composable
+private fun RepeatBlockRow(stepNumber: Int, repeat: WorkoutIntervalSubmission) {
+    val sets = repeat.reps ?: 1
+    val setsText = if (sets == 1) "1 set" else "$sets sets"
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Repeat header row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Step number badge
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(AmakaColors.accentPurple),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "$stepNumber",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+
+            Spacer(modifier = Modifier.width(AmakaSpacing.md.dp))
+
+            // Repeat label with sets count
+            Text(
+                text = "Repeat $stepNumber",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = AmakaColors.textPrimary
+            )
+
+            Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+
+            Text(
+                text = "- $setsText",
+                style = MaterialTheme.typography.bodyMedium,
+                color = AmakaColors.textSecondary
+            )
+        }
+
+        // Nested intervals (indented)
+        if (!repeat.intervals.isNullOrEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 40.dp, top = AmakaSpacing.xs.dp)
+            ) {
+                repeat.intervals.forEach { nested ->
+                    NestedIntervalRow(interval = nested)
+                    Spacer(modifier = Modifier.height(AmakaSpacing.xs.dp))
                 }
-                // Skip repeat blocks without nested intervals - they're just metadata
-            }
-            interval.type == "rest" -> {
-                // Skip rest intervals - they are between-step metadata
-            }
-            else -> {
-                result.add(interval)
             }
         }
     }
 }
 
 /**
- * Display a single workout step row
+ * Display a nested interval within a repeat block (indented, no number badge).
  */
 @Composable
-private fun WorkoutStepRow(stepNumber: Int, step: WorkoutIntervalSubmission) {
-    val (name, detail, target, iconColor) = when (step.type.lowercase()) {
-        "warmup" -> {
-            Tuple4("Warm Up", step.seconds?.let { formatTime(it) } ?: "", step.target, AmakaColors.accentOrange)
-        }
-        "cooldown" -> {
-            Tuple4("Cool Down", step.seconds?.let { formatTime(it) } ?: "", step.target, AmakaColors.accentBlue)
-        }
-        "time" -> {
-            Tuple4("Timed Interval", step.seconds?.let { formatTime(it) } ?: "", step.target, AmakaColors.accentGreen)
-        }
-        "reps" -> {
-            var detailStr = "${step.reps ?: 0} reps"
-            if (step.sets != null && step.sets > 1) {
-                detailStr = "${step.sets} × ${step.reps ?: 0} reps"
-            }
-            Tuple4(step.name ?: "Exercise", detailStr, null, AmakaColors.accentPurple)
-        }
-        "distance" -> {
-            val meters = step.seconds ?: 0 // distance stored in seconds field as meters
-            val distStr = if (meters >= 1000) {
-                String.format("%.1f km", meters / 1000.0)
-            } else {
-                "${meters}m"
-            }
-            Tuple4("Distance", distStr, step.target, AmakaColors.accentGreen)
-        }
-        else -> {
-            Tuple4(step.type.replaceFirstChar { it.uppercase() }, "", step.target, AmakaColors.textSecondary)
+private fun NestedIntervalRow(interval: WorkoutIntervalSubmission) {
+    val (name, detail, iconColor) = getIntervalDisplayInfo(interval)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Small dot indicator instead of number
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(iconColor)
+        )
+
+        Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+
+        // Name
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            color = AmakaColors.textPrimary
+        )
+
+        if (detail.isNotEmpty()) {
+            Spacer(modifier = Modifier.width(AmakaSpacing.xs.dp))
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = AmakaColors.textSecondary
+            )
         }
     }
+}
+
+/**
+ * Display a single interval row (not inside a repeat block).
+ */
+@Composable
+private fun SingleIntervalRow(stepNumber: Int, interval: WorkoutIntervalSubmission) {
+    val (name, detail, iconColor) = getIntervalDisplayInfo(interval)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -565,23 +628,62 @@ private fun WorkoutStepRow(stepNumber: Int, step: WorkoutIntervalSubmission) {
                 fontWeight = FontWeight.Medium,
                 color = AmakaColors.textPrimary
             )
-            Text(
-                text = detail,
-                style = MaterialTheme.typography.bodySmall,
-                color = AmakaColors.textSecondary
-            )
-            if (target != null && target.isNotEmpty()) {
+            if (detail.isNotEmpty()) {
                 Text(
-                    text = target,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AmakaColors.textTertiary
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AmakaColors.textSecondary
                 )
             }
         }
     }
 }
 
-private data class Tuple4<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+/**
+ * Get display info for an interval type.
+ * Returns Triple of (name, detail, iconColor)
+ */
+private fun getIntervalDisplayInfo(interval: WorkoutIntervalSubmission): Triple<String, String, Color> {
+    return when (interval.type.lowercase()) {
+        "warmup" -> {
+            val name = interval.target?.takeIf { it.isNotEmpty() } ?: "Warm Up"
+            Triple(name, interval.seconds?.let { formatTime(it) } ?: "", AmakaColors.accentOrange)
+        }
+        "cooldown" -> {
+            val name = interval.target?.takeIf { it.isNotEmpty() } ?: "Cool Down"
+            Triple(name, interval.seconds?.let { formatTime(it) } ?: "", AmakaColors.accentBlue)
+        }
+        "time" -> {
+            val name = interval.target?.takeIf { it.isNotEmpty() } ?: "Timed Interval"
+            Triple(name, interval.seconds?.let { formatTime(it) } ?: "", AmakaColors.accentGreen)
+        }
+        "reps" -> {
+            val name = interval.name ?: "Exercise"
+            var detail = "${interval.reps ?: 0} reps"
+            if (interval.sets != null && interval.sets > 1) {
+                detail = "${interval.sets} × ${interval.reps ?: 0} reps"
+            }
+            Triple(name, detail, AmakaColors.accentPurple)
+        }
+        "distance" -> {
+            val name = interval.target?.takeIf { it.isNotEmpty() } ?: "Distance"
+            val meters = interval.seconds ?: 0
+            val distStr = if (meters >= 1000) {
+                String.format("%.1f km", meters / 1000.0)
+            } else {
+                "${meters}m"
+            }
+            Triple(name, distStr, AmakaColors.accentGreen)
+        }
+        "rest" -> {
+            val detail = interval.seconds?.let { formatTime(it) } ?: "Tap when ready"
+            Triple("Rest", detail, AmakaColors.textTertiary)
+        }
+        else -> {
+            Triple(interval.type.replaceFirstChar { it.uppercase() }, "", AmakaColors.textSecondary)
+        }
+    }
+}
 
 private fun formatTime(seconds: Int): String {
     return if (seconds >= 60) {
