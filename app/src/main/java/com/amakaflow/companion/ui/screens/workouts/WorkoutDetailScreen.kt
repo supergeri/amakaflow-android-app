@@ -448,14 +448,20 @@ private fun buildBreakdownItems(intervals: List<WorkoutInterval>): List<Breakdow
 
 /**
  * Count total steps including expanded repeats
+ * Rest intervals inside repeats are not counted as separate steps
  */
 private fun countTotalSteps(intervals: List<WorkoutInterval>): Int {
     var count = 0
     for (interval in intervals) {
         when (interval) {
             is WorkoutInterval.Repeat -> {
-                // Count the repeat itself plus nested * reps
-                count += 1 + (interval.intervals.size * interval.reps)
+                // Count non-rest intervals inside repeat
+                val nonRestCount = interval.intervals.count { it !is WorkoutInterval.Rest }
+                count += 1 + (nonRestCount * interval.reps)
+            }
+            is WorkoutInterval.Rest -> {
+                // Rest intervals at top level count as steps
+                count++
             }
             else -> count++
         }
@@ -472,6 +478,7 @@ private val WorkoutInterval.displayName: String
         is WorkoutInterval.Reps -> name
         is WorkoutInterval.Distance -> "Distance"
         is WorkoutInterval.Repeat -> "Repeat ${reps}x"
+        is WorkoutInterval.Rest -> if (seconds != null) "Rest" else "Rest"
     }
 
 private val WorkoutInterval.totalDuration: String
@@ -493,11 +500,13 @@ private val WorkoutInterval.totalDuration: String
                     is WorkoutInterval.Warmup -> nested.seconds
                     is WorkoutInterval.Cooldown -> nested.seconds
                     is WorkoutInterval.Reps -> nested.restSec ?: 0
+                    is WorkoutInterval.Rest -> nested.seconds ?: 0
                     else -> 0
                 }
             }
             formatTime(nestedDuration * reps)
         }
+        is WorkoutInterval.Rest -> seconds?.let { formatTime(it) } ?: "Tap when ready"
     }
 
 private val WorkoutInterval.icon: ImageVector
@@ -508,6 +517,7 @@ private val WorkoutInterval.icon: ImageVector
         is WorkoutInterval.Reps -> Icons.Filled.FitnessCenter
         is WorkoutInterval.Distance -> Icons.Filled.DirectionsRun
         is WorkoutInterval.Repeat -> Icons.Filled.Refresh
+        is WorkoutInterval.Rest -> Icons.Filled.HourglassEmpty
     }
 
 private val WorkoutInterval.iconColor: Color
@@ -518,6 +528,7 @@ private val WorkoutInterval.iconColor: Color
         is WorkoutInterval.Reps -> AmakaColors.accentPurple
         is WorkoutInterval.Distance -> AmakaColors.accentGreen
         is WorkoutInterval.Repeat -> AmakaColors.accentYellow
+        is WorkoutInterval.Rest -> AmakaColors.textSecondary  // Gray for rest intervals
     }
 
 private fun formatTime(seconds: Int): String {

@@ -98,6 +98,13 @@ fun flattenIntervals(intervals: List<WorkoutInterval>): List<FlattenedStep> {
                     }
                 }
             }
+            is WorkoutInterval.Rest -> {
+                steps.add(FlattenedStep(
+                    name = "Rest",
+                    type = "rest",
+                    duration = interval.seconds
+                ))
+            }
         }
     }
 
@@ -392,6 +399,11 @@ private fun RawIntervalRow(
             "REPEAT x${interval.reps}",
             Color(0xFFFFD700),
             "contains ${interval.intervals.size} sub-intervals"
+        )
+        is WorkoutInterval.Rest -> Triple(
+            "REST",
+            AmakaColors.textSecondary,
+            "seconds=${interval.seconds ?: "manual"}"
         )
     }
 
