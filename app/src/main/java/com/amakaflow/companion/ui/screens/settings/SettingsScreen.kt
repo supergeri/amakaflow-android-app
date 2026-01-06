@@ -24,9 +24,11 @@ import com.amakaflow.companion.BuildConfig
 import com.amakaflow.companion.data.AppEnvironment
 import com.amakaflow.companion.data.TestConfig
 import com.amakaflow.companion.debug.DebugLog
+import com.amakaflow.companion.simulation.SimulationSettings
 import com.amakaflow.companion.ui.theme.AmakaColors
 import com.amakaflow.companion.ui.theme.AmakaCornerRadius
 import com.amakaflow.companion.ui.theme.AmakaSpacing
+import kotlinx.coroutines.delay
 
 enum class WorkoutDevice(val title: String, val subtitle: String) {
     WEAR_OS_PHONE("Wear OS + Android Phone", "Watch tracks • Phone guides"),
@@ -44,11 +46,24 @@ fun SettingsScreen(
     onNavigateToDebugLog: () -> Unit = {},
     onNavigateToTranscriptionSettings: () -> Unit = {},
     testConfig: TestConfig? = null,
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModel: SettingsViewModel = hiltViewModel(),
+    simulationSettings: SimulationSettings? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showEnvironmentDialog by remember { mutableStateOf(false) }
     var showUnpairDialog by remember { mutableStateOf(false) }
+
+    // 7-tap gesture to access debug settings
+    var tapCount by remember { mutableIntStateOf(0) }
+    var showDebugSettings by remember { mutableStateOf(false) }
+
+    // Reset tap count after 2 seconds of inactivity
+    LaunchedEffect(tapCount) {
+        if (tapCount > 0 && tapCount < 7) {
+            delay(2000)
+            tapCount = 0
+        }
+    }
 
     // Settings state
     var selectedDevice by remember { mutableStateOf(WorkoutDevice.PHONE_ONLY) }
@@ -70,7 +85,14 @@ fun SettingsScreen(
                 text = "Settings",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = AmakaColors.textPrimary
+                color = AmakaColors.textPrimary,
+                modifier = Modifier.clickable {
+                    tapCount++
+                    if (tapCount >= 7) {
+                        showDebugSettings = true
+                        tapCount = 0
+                    }
+                }
             )
             Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
         }
@@ -377,6 +399,14 @@ fun SettingsScreen(
             containerColor = AmakaColors.surface,
             titleContentColor = AmakaColors.textPrimary,
             textContentColor = AmakaColors.textSecondary
+        )
+    }
+
+    // Debug settings fullscreen dialog
+    if (showDebugSettings && simulationSettings != null) {
+        DebugSettingsScreen(
+            settings = simulationSettings,
+            onBack = { showDebugSettings = false }
         )
     }
 }
