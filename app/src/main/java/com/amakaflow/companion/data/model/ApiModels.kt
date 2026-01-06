@@ -146,7 +146,8 @@ data class WorkoutIntervalSubmission(
     val target: String? = null,
     val reps: Int? = null,
     val sets: Int? = null,
-    val name: String? = null
+    val name: String? = null,
+    val intervals: List<WorkoutIntervalSubmission>? = null  // For nested intervals in repeat blocks
 )
 
 /**
