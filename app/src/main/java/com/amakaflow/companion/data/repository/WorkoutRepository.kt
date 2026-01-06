@@ -5,10 +5,13 @@ import com.amakaflow.companion.data.model.Workout
 import com.amakaflow.companion.data.model.WorkoutCompletion
 import com.amakaflow.companion.data.model.WorkoutCompletionDetail
 import com.amakaflow.companion.data.model.WorkoutCompletionSubmission
+import com.amakaflow.companion.debug.DebugLog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val TAG = "API"
 
 sealed class Result<out T> {
     data class Success<T>(val data: T) : Result<T>()
@@ -47,23 +50,28 @@ class WorkoutRepository @Inject constructor(
 
     fun getIncomingWorkouts(): Flow<Result<List<Workout>>> = flow {
         emit(Result.Loading)
+        DebugLog.info("Fetching incoming workouts...", TAG)
         try {
             val response = api.getIncomingWorkouts()
             if (response.isSuccessful) {
                 val workouts = response.body() ?: emptyList()
                 // Cache workouts for later lookup by ID
                 cacheWorkouts(workouts)
+                DebugLog.success("Fetched ${workouts.size} incoming workout(s)", TAG)
                 emit(Result.Success(workouts))
             } else {
+                DebugLog.error("Failed to load incoming workouts: ${response.code()}", TAG)
                 emit(Result.Error("Failed to load workouts", response.code()))
             }
         } catch (e: Exception) {
+            DebugLog.error("Exception fetching incoming workouts: ${e.message}", TAG)
             emit(Result.Error(e.message ?: "Unknown error"))
         }
     }
 
     fun getPushedWorkouts(): Flow<Result<List<Workout>>> = flow {
         emit(Result.Loading)
+        DebugLog.info("Fetching pushed workouts...", TAG)
         try {
             val response = api.getPushedWorkouts()
             if (response.isSuccessful && response.body() != null) {
@@ -71,14 +79,18 @@ class WorkoutRepository @Inject constructor(
                 if (body.success) {
                     // Cache workouts for later lookup by ID
                     cacheWorkouts(body.workouts)
+                    DebugLog.success("Fetched ${body.workouts.size} pushed workout(s)", TAG)
                     emit(Result.Success(body.workouts))
                 } else {
+                    DebugLog.error("Failed to load pushed workouts: ${body.message}", TAG)
                     emit(Result.Error(body.message ?: "Failed to load pushed workouts", response.code()))
                 }
             } else {
+                DebugLog.error("Failed to load pushed workouts: ${response.code()}", TAG)
                 emit(Result.Error("Failed to load pushed workouts", response.code()))
             }
         } catch (e: Exception) {
+            DebugLog.error("Exception fetching pushed workouts: ${e.message}", TAG)
             emit(Result.Error(e.message ?: "Unknown error"))
         }
     }
@@ -148,14 +160,18 @@ class WorkoutRepository @Inject constructor(
      * Submit a completed workout to the API
      */
     suspend fun completeWorkout(submission: WorkoutCompletionSubmission): Result<WorkoutCompletion> {
+        DebugLog.info("Submitting workout completion for: ${submission.workoutId}", TAG)
         return try {
             val response = api.completeWorkout(submission)
             if (response.isSuccessful && response.body() != null) {
+                DebugLog.success("Workout completion submitted successfully", TAG)
                 Result.Success(response.body()!!)
             } else {
+                DebugLog.error("Failed to submit completion: ${response.code()}", TAG)
                 Result.Error("Failed to submit completion", response.code())
             }
         } catch (e: Exception) {
+            DebugLog.error("Exception submitting completion: ${e.message}", TAG)
             Result.Error(e.message ?: "Unknown error")
         }
     }

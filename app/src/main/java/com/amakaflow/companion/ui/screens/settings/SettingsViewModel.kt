@@ -45,14 +45,19 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
-        observePairingState()
+        // Set initial state immediately, including test mode check
+        val isTestMode = testConfig.isTestModeEnabled
+        val actuallyPaired = pairingRepository.getToken() != null
         _uiState.update {
             it.copy(
-                environment = testConfig.appEnvironment,  // Read persisted value
-                isTestModeEnabled = testConfig.isTestModeEnabled,
-                testUserEmail = testConfig.testUserEmail
+                environment = testConfig.appEnvironment,
+                isTestModeEnabled = isTestMode,
+                testUserEmail = if (isTestMode) testConfig.testUserEmail else null,
+                isPaired = actuallyPaired || isTestMode,
+                userEmail = if (isTestMode) testConfig.testUserEmail else null
             )
         }
+        observePairingState()
         // Auto-check pending workouts on init
         checkPendingWorkouts()
     }

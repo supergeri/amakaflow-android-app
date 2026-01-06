@@ -20,8 +20,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.amakaflow.companion.BuildConfig
 import com.amakaflow.companion.data.AppEnvironment
 import com.amakaflow.companion.data.TestConfig
+import com.amakaflow.companion.debug.DebugLog
 import com.amakaflow.companion.ui.theme.AmakaColors
 import com.amakaflow.companion.ui.theme.AmakaCornerRadius
 import com.amakaflow.companion.ui.theme.AmakaSpacing
@@ -39,7 +41,7 @@ enum class MusicBehavior {
 fun SettingsScreen(
     onNavigateToPairing: () -> Unit = {},
     onNavigateToWorkoutDebug: () -> Unit = {},
-    onNavigateToErrorLog: () -> Unit = {},
+    onNavigateToDebugLog: () -> Unit = {},
     onNavigateToTranscriptionSettings: () -> Unit = {},
     testConfig: TestConfig? = null,
     viewModel: SettingsViewModel = hiltViewModel()
@@ -246,10 +248,8 @@ fun SettingsScreen(
                 appVersion = uiState.appVersion,
                 onCopyToken = { /* Copy API token */ },
                 onRefreshToken = { /* Refresh token */ },
-                onViewErrorLog = onNavigateToErrorLog,
                 onCheckNow = { viewModel.checkPendingWorkouts() },
                 onWorkoutDebug = onNavigateToWorkoutDebug,
-                errorCount = 0,
                 onEnvironmentClick = { showEnvironmentDialog = true },
                 pendingWorkouts = uiState.pendingWorkouts
             )
@@ -259,6 +259,25 @@ fun SettingsScreen(
             DisconnectButton(
                 onClick = { showUnpairDialog = true }
             )
+        }
+
+        // DEBUG section (only in debug builds or staging)
+        if (BuildConfig.DEBUG || uiState.environment == AppEnvironment.STAGING) {
+            item {
+                Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+                SectionHeader("DEBUG")
+            }
+            item {
+                val logCount by DebugLog.entries.collectAsState()
+                NavigationSettingItem(
+                    icon = Icons.Filled.BugReport,
+                    iconBackground = AmakaColors.accentOrange.copy(alpha = 0.2f),
+                    iconTint = AmakaColors.accentOrange,
+                    title = "Debug Logs",
+                    subtitle = "${logCount.size} entries",
+                    onClick = onNavigateToDebugLog
+                )
+            }
         }
 
         // LEGAL section
@@ -694,10 +713,8 @@ private fun AccountInfoCard(
     appVersion: String,
     onCopyToken: () -> Unit,
     onRefreshToken: () -> Unit,
-    onViewErrorLog: () -> Unit,
     onCheckNow: () -> Unit,
     onWorkoutDebug: () -> Unit,
-    errorCount: Int,
     onEnvironmentClick: () -> Unit,
     pendingWorkouts: PendingWorkoutsState = PendingWorkoutsState()
 ) {
@@ -794,28 +811,6 @@ private fun AccountInfoCard(
                 label = "Refresh Token",
                 action = {
                     SmallButton(text = "Refresh", color = AmakaColors.accentGreen, onClick = onRefreshToken)
-                }
-            )
-            AccountInfoRow(
-                icon = Icons.Filled.BugReport,
-                label = "Error Log",
-                action = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable(onClick = onViewErrorLog)
-                    ) {
-                        Text(
-                            text = errorCount.toString(),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = AmakaColors.textSecondary
-                        )
-                        Icon(
-                            imageVector = Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = AmakaColors.textTertiary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
                 }
             )
 
