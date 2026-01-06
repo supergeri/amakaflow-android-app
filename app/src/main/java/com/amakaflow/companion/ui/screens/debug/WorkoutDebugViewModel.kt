@@ -142,6 +142,8 @@ class WorkoutDebugViewModel @Inject constructor(
                 }.joinToString("\n")
                 "[$index] REPEAT: ${interval.reps}x\n$nested"
             }
+            is com.amakaflow.companion.data.model.WorkoutInterval.Rest ->
+                "[$index] REST: ${interval.seconds?.let { "${it}s" } ?: "manual"}"
         }
     }
 }

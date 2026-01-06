@@ -119,6 +119,7 @@ data class FlattenedInterval(
             is WorkoutInterval.Reps -> StepType.REPS
             is WorkoutInterval.Distance -> StepType.DISTANCE
             is WorkoutInterval.Repeat -> StepType.TIMED // Should be flattened before reaching here
+            is WorkoutInterval.Rest -> StepType.TIMED // Rest intervals have optional duration
         }
 
     val stepName: String
@@ -129,6 +130,7 @@ data class FlattenedInterval(
             is WorkoutInterval.Reps -> i.name
             is WorkoutInterval.Distance -> "Distance"
             is WorkoutInterval.Repeat -> "Repeat" // Should be flattened
+            is WorkoutInterval.Rest -> if (i.seconds != null) "Rest" else "Rest"
         }
 
     val durationSeconds: Int?
@@ -139,19 +141,28 @@ data class FlattenedInterval(
             is WorkoutInterval.Reps -> null
             is WorkoutInterval.Distance -> null
             is WorkoutInterval.Repeat -> null
+            is WorkoutInterval.Rest -> i.seconds  // null for manual rest
         }
 
     val targetReps: Int?
-        get() = when (val i = interval) {
-            is WorkoutInterval.Reps -> i.reps
+        get() = when (interval) {
+            is WorkoutInterval.Reps -> interval.reps
             else -> null
         }
 
     val restSeconds: Int?
-        get() = when (val i = interval) {
-            is WorkoutInterval.Reps -> i.restSec
+        get() = when (interval) {
+            is WorkoutInterval.Reps -> interval.restSec
             else -> null
         }
+
+    /** Whether this is a rest interval (not a work interval) */
+    val isRestInterval: Boolean
+        get() = interval is WorkoutInterval.Rest
+
+    /** Whether this is a manual rest (tap when ready) vs timed rest */
+    val isManualRestInterval: Boolean
+        get() = interval is WorkoutInterval.Rest && (interval as WorkoutInterval.Rest).seconds == null
 }
 
 /**
@@ -208,6 +219,26 @@ object IntervalFlattener {
                             interval = interval,
                             roundInfo = roundPrefix,
                             restAfterSeconds = null // Manual rest after standalone timed intervals
+                        ))
+                    }
+                }
+                is WorkoutInterval.Rest -> {
+                    // Rest intervals represent explicit rest periods
+                    // Apply as rest to the previous step if inside a repeat, otherwise add as step
+                    if (isInsideRepeat && result.isNotEmpty()) {
+                        // Apply this rest to the previous step
+                        val lastStep = result.last()
+                        result[result.size - 1] = lastStep.copy(
+                            restAfterSeconds = interval.seconds  // null = manual rest
+                        )
+                    } else {
+                        // Standalone Rest interval - add as a separate step
+                        result.add(FlattenedInterval(
+                            index = 0,
+                            interval = interval,
+                            roundInfo = roundPrefix,
+                            restAfterSeconds = null,
+                            hasRestAfter = false  // Rest steps don't have additional rest after
                         ))
                     }
                 }

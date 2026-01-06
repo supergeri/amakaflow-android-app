@@ -55,6 +55,15 @@ sealed class WorkoutInterval {
         val reps: Int,
         val intervals: List<WorkoutInterval>
     ) : WorkoutInterval()
+
+    /**
+     * Rest interval - either timed or manual ("tap when ready")
+     * @param seconds Duration in seconds, or null for manual rest
+     */
+    @Serializable
+    data class Rest(
+        val seconds: Int?  // null = manual rest ("tap when ready")
+    ) : WorkoutInterval()
 }
 
 /**
@@ -104,6 +113,10 @@ object WorkoutIntervalSerializer : KSerializer<WorkoutInterval> {
                     put("reps", value.reps)
                     put("intervals", Json.encodeToJsonElement(value.intervals))
                 }
+                is WorkoutInterval.Rest -> {
+                    put("kind", "rest")
+                    value.seconds?.let { put("seconds", it) }
+                }
             }
         }
         jsonEncoder.encodeJsonElement(jsonObject)
@@ -146,6 +159,9 @@ object WorkoutIntervalSerializer : KSerializer<WorkoutInterval> {
                 reps = element["reps"]!!.jsonPrimitive.int,
                 intervals = Json.decodeFromJsonElement(element["intervals"]!!)
             )
+            "rest" -> WorkoutInterval.Rest(
+                seconds = element["seconds"]?.jsonPrimitive?.intOrNull
+            )
             else -> throw IllegalArgumentException("Unknown interval kind: $kind")
         }
     }
@@ -185,6 +201,10 @@ fun WorkoutInterval.toSubmissionInterval(): WorkoutIntervalSubmission {
         is WorkoutInterval.Repeat -> WorkoutIntervalSubmission(
             type = "repeat",
             reps = reps
+        )
+        is WorkoutInterval.Rest -> WorkoutIntervalSubmission(
+            type = "rest",
+            seconds = seconds
         )
     }
 }
