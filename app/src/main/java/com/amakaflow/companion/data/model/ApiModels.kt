@@ -133,7 +133,9 @@ data class WorkoutCompletionSubmission(
     @SerialName("device_info")
     val deviceInfo: CompletionDeviceInfo? = null,
     @SerialName("workout_structure")
-    val workoutStructure: List<WorkoutIntervalSubmission>? = null
+    val workoutStructure: List<WorkoutIntervalSubmission>? = null,
+    @SerialName("is_simulated")
+    val isSimulated: Boolean = false
 )
 
 /**

@@ -175,7 +175,8 @@ class CompletionSyncWorker @AssistedInject constructor(
                 steps = null
             ),
             deviceInfo = deviceInfo,
-            workoutStructure = structure
+            workoutStructure = structure,
+            isSimulated = entity.isSimulated
         )
     }
 }

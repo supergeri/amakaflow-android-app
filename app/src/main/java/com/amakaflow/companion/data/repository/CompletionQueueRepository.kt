@@ -68,7 +68,8 @@ class CompletionQueueRepository @Inject constructor(
             activeCalories = submission.healthMetrics.activeCalories,
             totalCalories = submission.healthMetrics.totalCalories,
             deviceInfoJson = submission.deviceInfo?.let { json.encodeToString(it) },
-            workoutStructureJson = submission.workoutStructure?.let { json.encodeToString(it) }
+            workoutStructureJson = submission.workoutStructure?.let { json.encodeToString(it) },
+            isSimulated = submission.isSimulated
         )
 
         pendingCompletionDao.insert(entity)
