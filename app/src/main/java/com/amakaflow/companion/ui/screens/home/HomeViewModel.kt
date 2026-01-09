@@ -1,5 +1,6 @@
 package com.amakaflow.companion.ui.screens.home
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amakaflow.companion.data.model.WeeklySummary
@@ -11,6 +12,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val TAG = "HomeViewModel"
 
 data class HomeUiState(
     val isLoading: Boolean = true,
@@ -46,13 +49,17 @@ class HomeViewModel @Inject constructor(
 
     private fun loadData() {
         viewModelScope.launch {
+            Log.d(TAG, "loadData: Starting to fetch pushed workouts")
             // Load pushed workouts from android-companion endpoint
             workoutRepository.getPushedWorkouts().collect { result ->
+                Log.d(TAG, "loadData: Got result: $result")
                 when (result) {
                     is Result.Loading -> {
+                        Log.d(TAG, "loadData: Loading...")
                         _uiState.update { it.copy(isLoading = true, error = null) }
                     }
                     is Result.Success -> {
+                        Log.d(TAG, "loadData: Success! Found ${result.data.size} workouts: ${result.data.map { it.name }}")
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
@@ -61,8 +68,10 @@ class HomeViewModel @Inject constructor(
                                 error = null
                             )
                         }
+                        Log.d(TAG, "loadData: Updated state, todayWorkouts=${_uiState.value.todayWorkouts.size}")
                     }
                     is Result.Error -> {
+                        Log.e(TAG, "loadData: Error - ${result.message}")
                         _uiState.update {
                             it.copy(
                                 isLoading = false,

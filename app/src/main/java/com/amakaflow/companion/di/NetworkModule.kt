@@ -136,9 +136,9 @@ object NetworkModule {
 
             // Check for E2E test mode first (takes precedence)
             if (BuildConfig.DEBUG && testConfig.isTestModeEnabled) {
-                testConfig.testAuthSecret?.let { secret ->
+                testConfig.testAuthSecret?.trim()?.let { secret ->
                     request.addHeader("X-Test-Auth", secret)
-                    testConfig.testUserId?.let { userId ->
+                    testConfig.testUserId?.trim()?.let { userId ->
                         request.addHeader("X-Test-User-Id", userId)
                     }
                 }
