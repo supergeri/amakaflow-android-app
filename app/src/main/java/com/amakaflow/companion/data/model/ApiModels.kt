@@ -115,6 +115,30 @@ data class HealthMetrics(
 )
 
 /**
+ * AMA-287: Set entry for weight tracking during reps exercises
+ */
+@Serializable
+data class SetEntry(
+    @SerialName("set_number")
+    val setNumber: Int,
+    val weight: Double? = null,
+    val unit: String? = null,
+    val completed: Boolean = true
+)
+
+/**
+ * AMA-287: Exercise set log for weight tracking
+ */
+@Serializable
+data class SetLog(
+    @SerialName("exercise_name")
+    val exerciseName: String,
+    @SerialName("exercise_index")
+    val exerciseIndex: Int,
+    val sets: List<SetEntry>
+)
+
+/**
  * Workout completion submission - matches iOS WorkoutCompletionRequest structure
  */
 @Serializable
@@ -135,7 +159,9 @@ data class WorkoutCompletionSubmission(
     @SerialName("workout_structure")
     val workoutStructure: List<WorkoutIntervalSubmission>? = null,
     @SerialName("is_simulated")
-    val isSimulated: Boolean = false
+    val isSimulated: Boolean = false,
+    @SerialName("set_logs")
+    val setLogs: List<SetLog>? = null
 )
 
 /**

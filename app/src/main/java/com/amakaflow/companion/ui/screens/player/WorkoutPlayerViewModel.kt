@@ -32,7 +32,12 @@ data class WorkoutPlayerUiState(
     val isManualRest: Boolean = false,
     val error: String? = null,
     val showEndConfirmation: Boolean = false,
-    val workoutCompleted: Boolean = false
+    val workoutCompleted: Boolean = false,
+    // AMA-287: Weight tracking for reps exercises
+    val setNumber: Int = 1,
+    val totalSetsForExercise: Int = 1,
+    val suggestedWeight: Double? = null,
+    val weightUnit: String = "lbs"
 ) {
     val currentStep: FlattenedInterval?
         get() = flattenedSteps.getOrNull(currentStepIndex)
@@ -102,6 +107,10 @@ class WorkoutPlayerViewModel @Inject constructor(
 
     private var timerJob: Job? = null
     private var workoutStartTime: Instant? = null
+
+    // AMA-287: Weight tracking
+    private val setLogs = mutableMapOf<String, MutableList<SetEntry>>() // exercise name -> set entries
+    private var lastLoggedWeights = mutableMapOf<String, Double>() // exercise name -> last weight
 
     init {
         loadWorkout()
@@ -217,6 +226,43 @@ class WorkoutPlayerViewModel @Inject constructor(
         completeRest()
     }
 
+    // AMA-287: Log weight for current set and advance to next step
+    fun logSetWeight(weight: Double?, unit: String) {
+        val currentState = _uiState.value
+        val step = currentState.currentStep ?: return
+
+        if (step.stepType != StepType.REPS) return
+
+        val exerciseName = step.stepName
+        val setNumber = currentState.setNumber
+
+        // Record the weight
+        val setEntry = SetEntry(
+            setNumber = setNumber,
+            weight = weight,
+            unit = if (weight != null) unit else null,
+            completed = true
+        )
+
+        // Add to set logs
+        setLogs.getOrPut(exerciseName) { mutableListOf() }.add(setEntry)
+
+        // Remember weight for next set of same exercise
+        if (weight != null) {
+            lastLoggedWeights[exerciseName] = weight
+        }
+
+        DebugLog.debug("Logged set: $exerciseName set $setNumber, weight=${weight ?: "skipped"} $unit", TAG)
+
+        // Advance to next step
+        nextStep()
+    }
+
+    // AMA-287: Skip weight entry and advance
+    fun skipSetWeight() {
+        logSetWeight(null, _uiState.value.weightUnit)
+    }
+
     fun showEndConfirmation() {
         _uiState.update { it.copy(showEndConfirmation = true) }
     }
@@ -277,18 +323,65 @@ class WorkoutPlayerViewModel @Inject constructor(
 
         val step = _uiState.value.currentStep ?: return
 
+        // AMA-287: Calculate set number and total sets for reps exercises
+        val (setNumber, totalSets, suggestedWeight) = if (step.stepType == StepType.REPS) {
+            calculateSetInfo(step)
+        } else {
+            Triple(1, 1, null)
+        }
+
         if (step.durationSeconds != null) {
-            _uiState.update { it.copy(remainingSeconds = step.durationSeconds!!) }
+            _uiState.update {
+                it.copy(
+                    remainingSeconds = step.durationSeconds!!,
+                    setNumber = setNumber,
+                    totalSetsForExercise = totalSets,
+                    suggestedWeight = suggestedWeight
+                )
+            }
             if (_uiState.value.phase == WorkoutPhase.RUNNING) {
                 startTimer()
             }
         } else {
-            _uiState.update { it.copy(remainingSeconds = 0) }
+            _uiState.update {
+                it.copy(
+                    remainingSeconds = 0,
+                    setNumber = setNumber,
+                    totalSetsForExercise = totalSets,
+                    suggestedWeight = suggestedWeight
+                )
+            }
             // For reps-based exercises, still run elapsed timer
             if (_uiState.value.phase == WorkoutPhase.RUNNING) {
                 startElapsedOnlyTimer()
             }
         }
+    }
+
+    // AMA-287: Calculate set info for current exercise
+    private fun calculateSetInfo(step: FlattenedInterval): Triple<Int, Int, Double?> {
+        val exerciseName = step.stepName
+        val allSteps = _uiState.value.flattenedSteps
+        val currentIndex = _uiState.value.currentStepIndex
+
+        // Count total sets of this exercise in the workout
+        val totalSets = allSteps.count {
+            it.stepType == StepType.REPS && it.stepName == exerciseName
+        }
+
+        // Count which set we're on (1-based)
+        var setNumber = 1
+        for (i in 0 until currentIndex) {
+            val s = allSteps[i]
+            if (s.stepType == StepType.REPS && s.stepName == exerciseName) {
+                setNumber++
+            }
+        }
+
+        // Get suggested weight from last logged weight for this exercise
+        val suggestedWeight = lastLoggedWeights[exerciseName]
+
+        return Triple(setNumber, totalSets, suggestedWeight)
     }
 
     private fun startTimer() {
@@ -413,6 +506,10 @@ class WorkoutPlayerViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                // AMA-287: Build set logs for submission
+                val allSteps = _uiState.value.flattenedSteps
+                val setLogsForSubmission = buildSetLogsForSubmission(allSteps)
+
                 val submission = WorkoutCompletionSubmission(
                     workoutId = workoutId,
                     workoutName = workoutName ?: "Workout",
@@ -429,7 +526,8 @@ class WorkoutPlayerViewModel @Inject constructor(
                         steps = null
                     ),
                     workoutStructure = intervals?.map { it.toSubmissionInterval() },
-                    isSimulated = simulationSettings.isEnabledSync()
+                    isSimulated = simulationSettings.isEnabledSync(),
+                    setLogs = setLogsForSubmission.ifEmpty { null }
                 )
                 val result = workoutRepository.completeWorkout(submission)
                 when (result) {
@@ -446,6 +544,33 @@ class WorkoutPlayerViewModel @Inject constructor(
                 DebugLog.error(e, TAG)
             }
         }
+    }
+
+    // AMA-287: Build SetLog list for completion submission
+    private fun buildSetLogsForSubmission(allSteps: List<FlattenedInterval>): List<SetLog> {
+        // Group set entries by exercise name and calculate exercise index
+        val exerciseIndices = mutableMapOf<String, Int>()
+        var currentIndex = 0
+
+        for (step in allSteps) {
+            if (step.stepType == StepType.REPS) {
+                val name = step.stepName
+                if (!exerciseIndices.containsKey(name)) {
+                    exerciseIndices[name] = currentIndex++
+                }
+            }
+        }
+
+        return setLogs.mapNotNull { (exerciseName, entries) ->
+            val exerciseIndex = exerciseIndices[exerciseName] ?: return@mapNotNull null
+            if (entries.isEmpty()) return@mapNotNull null
+
+            SetLog(
+                exerciseName = exerciseName,
+                exerciseIndex = exerciseIndex,
+                sets = entries.toList()
+            )
+        }.sortedBy { it.exerciseIndex }
     }
 
     override fun onCleared() {

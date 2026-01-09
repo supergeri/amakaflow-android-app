@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.amakaflow.companion.data.model.FlattenedInterval
 import com.amakaflow.companion.data.model.StepType
 import com.amakaflow.companion.data.model.WorkoutPhase
+import com.amakaflow.companion.ui.components.WeightInputView
 import com.amakaflow.companion.ui.theme.AmakaColors
 import com.amakaflow.companion.ui.theme.AmakaCornerRadius
 import com.amakaflow.companion.ui.theme.AmakaSpacing
@@ -124,7 +125,14 @@ fun WorkoutPlayerScreen(
                                 remainingTime = uiState.formattedRemainingTime,
                                 stepIndex = uiState.currentStepIndex + 1,
                                 totalSteps = uiState.flattenedSteps.size,
-                                nextStep = uiState.nextStep
+                                nextStep = uiState.nextStep,
+                                // AMA-287: Weight input props
+                                setNumber = uiState.setNumber,
+                                totalSetsForExercise = uiState.totalSetsForExercise,
+                                suggestedWeight = uiState.suggestedWeight,
+                                weightUnit = uiState.weightUnit,
+                                onLogSet = { weight, unit -> viewModel.logSetWeight(weight, unit) },
+                                onSkipWeight = { viewModel.skipSetWeight() }
                             )
                         }
                     }
@@ -223,7 +231,14 @@ private fun CurrentStepView(
     remainingTime: String,
     stepIndex: Int,
     totalSteps: Int,
-    nextStep: FlattenedInterval?
+    nextStep: FlattenedInterval?,
+    // AMA-287: Weight input parameters
+    setNumber: Int = 1,
+    totalSetsForExercise: Int = 1,
+    suggestedWeight: Double? = null,
+    weightUnit: String = "lbs",
+    onLogSet: (Double?, String) -> Unit = { _, _ -> },
+    onSkipWeight: () -> Unit = {}
 ) {
     if (step == null) return
 
@@ -259,20 +274,20 @@ private fun CurrentStepView(
             Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
         }
 
-        // Step name
-        Text(
-            text = step.stepName,
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = AmakaColors.textPrimary,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
-
         // Timer or reps display
         when (step.stepType) {
             StepType.TIMED -> {
+                // Step name
+                Text(
+                    text = step.stepName,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = AmakaColors.textPrimary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+
                 Text(
                     text = remainingTime,
                     style = MaterialTheme.typography.displayLarge.copy(
@@ -283,23 +298,49 @@ private fun CurrentStepView(
                 )
             }
             StepType.REPS -> {
+                // AMA-287: Show weight input for reps exercises
+                // Display target reps first
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "${step.targetReps ?: 0}",
                         style = MaterialTheme.typography.displayLarge.copy(
-                            fontSize = 72.sp,
+                            fontSize = 56.sp,
                             fontWeight = FontWeight.Bold
                         ),
                         color = AmakaColors.accentBlue
                     )
                     Text(
                         text = "reps",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = AmakaColors.textSecondary
                     )
                 }
+
+                Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+
+                // Weight input view
+                WeightInputView(
+                    exerciseName = step.stepName,
+                    setNumber = setNumber,
+                    totalSets = totalSetsForExercise,
+                    suggestedWeight = suggestedWeight,
+                    weightUnit = weightUnit,
+                    onLogSet = onLogSet,
+                    onSkipWeight = onSkipWeight
+                )
             }
             StepType.DISTANCE -> {
+                // Step name
+                Text(
+                    text = step.stepName,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = AmakaColors.textPrimary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+
                 Text(
                     text = step.stepName,
                     style = MaterialTheme.typography.displayMedium.copy(
@@ -310,10 +351,12 @@ private fun CurrentStepView(
             }
         }
 
-        // Coming up next
-        nextStep?.let { next ->
-            Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
-            ComingUpView(nextStep = next)
+        // Coming up next (only show for non-reps, since reps has weight input)
+        if (step.stepType != StepType.REPS) {
+            nextStep?.let { next ->
+                Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
+                ComingUpView(nextStep = next)
+            }
         }
     }
 }
