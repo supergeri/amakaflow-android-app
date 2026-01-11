@@ -47,6 +47,12 @@ object AmakaColors {
     val sportMobility = accentOrange
     val sportSwimming = Color(0xFF06B6D4)
     val sportCardio = accentRed
+
+    // Sync status colors (matching iOS)
+    val syncSynced = Color(0xFF34C759)      // Green
+    val syncPending = Color(0xFFFF9500)     // Orange
+    val syncFailed = Color(0xFFFF3B30)      // Red
+    val syncNotAssigned = Color(0xFF8E8E93) // Gray
 }
 
 /**

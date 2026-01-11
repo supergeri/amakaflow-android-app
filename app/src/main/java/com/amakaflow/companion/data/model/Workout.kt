@@ -4,6 +4,67 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
+ * Device types that workouts can be synced to
+ */
+@Serializable
+enum class SyncDeviceType {
+    @SerialName("apple_watch") APPLE_WATCH,
+    @SerialName("garmin") GARMIN,
+    @SerialName("wear_os") WEAR_OS;
+
+    companion object {
+        fun fromString(value: String): SyncDeviceType {
+            return when (value.lowercase()) {
+                "apple_watch" -> APPLE_WATCH
+                "garmin" -> GARMIN
+                "wear_os", "android_wear" -> WEAR_OS
+                else -> WEAR_OS
+            }
+        }
+    }
+}
+
+/**
+ * Sync status states for a workout
+ */
+@Serializable
+enum class SyncState {
+    @SerialName("not_assigned") NOT_ASSIGNED,
+    @SerialName("pending") PENDING,
+    @SerialName("syncing") SYNCING,
+    @SerialName("synced") SYNCED,
+    @SerialName("failed") FAILED,
+    @SerialName("outdated") OUTDATED;
+
+    companion object {
+        fun fromString(value: String): SyncState {
+            return when (value.lowercase()) {
+                "not_assigned" -> NOT_ASSIGNED
+                "pending" -> PENDING
+                "syncing" -> SYNCING
+                "synced" -> SYNCED
+                "failed" -> FAILED
+                "outdated" -> OUTDATED
+                else -> NOT_ASSIGNED
+            }
+        }
+    }
+}
+
+/**
+ * Sync status for a workout on a specific device
+ */
+@Serializable
+data class WorkoutSyncStatus(
+    @SerialName("device_id") val deviceId: String,
+    @SerialName("device_type") val deviceType: SyncDeviceType,
+    val status: SyncState,
+    @SerialName("last_sync_at") val lastSyncAt: String? = null,
+    @SerialName("error_message") val errorMessage: String? = null,
+    @SerialName("queued_at") val queuedAt: String? = null
+)
+
+/**
  * Workout sport types
  */
 @Serializable(with = WorkoutSportSerializer::class)
