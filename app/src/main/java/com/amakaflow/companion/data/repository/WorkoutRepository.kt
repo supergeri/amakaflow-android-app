@@ -1,6 +1,8 @@
 package com.amakaflow.companion.data.repository
 
 import com.amakaflow.companion.data.api.AmakaflowApi
+import com.amakaflow.companion.data.model.ConfirmSyncRequest
+import com.amakaflow.companion.data.model.ReportSyncFailedRequest
 import com.amakaflow.companion.data.model.Workout
 import com.amakaflow.companion.data.model.WorkoutCompletion
 import com.amakaflow.companion.data.model.WorkoutCompletionDetail
@@ -177,6 +179,50 @@ class WorkoutRepository @Inject constructor(
             }
         } catch (e: Exception) {
             DebugLog.error("Exception submitting completion: ${e.message}", TAG)
+            Result.Error(e.message ?: "Unknown error")
+        }
+    }
+
+    /**
+     * Confirm successful workout sync to backend (AMA-307)
+     * Called after successfully saving a pushed workout to the device
+     */
+    suspend fun confirmSync(workoutId: String): Result<Unit> {
+        DebugLog.info("Confirming sync for workout: $workoutId", TAG)
+        return try {
+            val request = ConfirmSyncRequest(workoutId = workoutId)
+            val response = api.confirmSync(request)
+            if (response.isSuccessful) {
+                DebugLog.success("Sync confirmed for workout: $workoutId", TAG)
+                Result.Success(Unit)
+            } else {
+                DebugLog.error("Failed to confirm sync: ${response.code()}", TAG)
+                Result.Error("Failed to confirm sync", response.code())
+            }
+        } catch (e: Exception) {
+            DebugLog.error("Exception confirming sync: ${e.message}", TAG)
+            Result.Error(e.message ?: "Unknown error")
+        }
+    }
+
+    /**
+     * Report failed workout sync to backend (AMA-307)
+     * Called when saving a pushed workout fails
+     */
+    suspend fun reportSyncFailed(workoutId: String, error: String): Result<Unit> {
+        DebugLog.info("Reporting sync failure for workout: $workoutId - $error", TAG)
+        return try {
+            val request = ReportSyncFailedRequest(workoutId = workoutId, error = error)
+            val response = api.reportSyncFailed(request)
+            if (response.isSuccessful) {
+                DebugLog.success("Sync failure reported for workout: $workoutId", TAG)
+                Result.Success(Unit)
+            } else {
+                DebugLog.error("Failed to report sync failure: ${response.code()}", TAG)
+                Result.Error("Failed to report sync failure", response.code())
+            }
+        } catch (e: Exception) {
+            DebugLog.error("Exception reporting sync failure: ${e.message}", TAG)
             Result.Error(e.message ?: "Unknown error")
         }
     }

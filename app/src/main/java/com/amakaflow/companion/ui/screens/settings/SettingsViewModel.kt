@@ -150,6 +150,16 @@ class SettingsViewModel @Inject constructor(
                                 )
                             )
                         }
+
+                        // AMA-307: Confirm sync for each successfully fetched workout
+                        result.data.forEach { workout ->
+                            try {
+                                workoutRepository.confirmSync(workout.id)
+                                Log.d(TAG, "Confirmed sync for workout: ${workout.name}")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to confirm sync for ${workout.name}: ${e.message}")
+                            }
+                        }
                     }
                     is Result.Error -> {
                         Log.e(TAG, "checkPendingWorkouts: Error - ${result.message}")

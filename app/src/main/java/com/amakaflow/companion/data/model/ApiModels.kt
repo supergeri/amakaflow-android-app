@@ -344,3 +344,41 @@ data class WorkoutResponse(
     val workout: Workout? = null,
     val message: String? = null
 )
+
+// AMA-307: Sync Queue Models
+
+/**
+ * Request to confirm a successful workout sync
+ */
+@Serializable
+data class ConfirmSyncRequest(
+    @SerialName("workout_id")
+    val workoutId: String,
+    @SerialName("device_type")
+    val deviceType: String = "android",
+    @SerialName("device_id")
+    val deviceId: String? = null
+)
+
+/**
+ * Request to report a failed workout sync
+ */
+@Serializable
+data class ReportSyncFailedRequest(
+    @SerialName("workout_id")
+    val workoutId: String,
+    @SerialName("device_type")
+    val deviceType: String = "android",
+    val error: String,
+    @SerialName("device_id")
+    val deviceId: String? = null
+)
+
+/**
+ * Response for sync confirmation/failure endpoints
+ */
+@Serializable
+data class SyncStatusResponse(
+    val success: Boolean,
+    val message: String? = null
+)
