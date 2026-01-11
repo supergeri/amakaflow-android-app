@@ -7,7 +7,9 @@ import com.amakaflow.companion.data.model.*
 import com.amakaflow.companion.data.repository.Result
 import com.amakaflow.companion.data.repository.WorkoutRepository
 import com.amakaflow.companion.debug.DebugLog
+import com.amakaflow.companion.simulation.SimulatedWeightProvider
 import com.amakaflow.companion.simulation.SimulationSettings
+import com.amakaflow.companion.simulation.random
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -354,6 +356,30 @@ class WorkoutPlayerViewModel @Inject constructor(
             // For reps-based exercises, still run elapsed timer
             if (_uiState.value.phase == WorkoutPhase.RUNNING) {
                 startElapsedOnlyTimer()
+            }
+        }
+
+        // AMA-308: Auto-select weight in simulation mode for REPS exercises
+        if (step.stepType == StepType.REPS) {
+            viewModelScope.launch {
+                val snapshot = simulationSettings.getSnapshot()
+                if (snapshot.isEnabled && snapshot.simulateWeight) {
+                    // Create weight provider with user's configured profile
+                    val provider = SimulatedWeightProvider(snapshot.weightProfileEnum)
+                    val simulatedWeight = provider.getSimulatedWeight(
+                        step.stepName,
+                        _uiState.value.weightUnit
+                    )
+
+                    // Apply realistic delay based on behavior profile, scaled by simulation speed
+                    val reactionTimeMs = (snapshot.behaviorProfile.reactionTime.random() * 1000).toLong()
+                    val scaledDelayMs = (reactionTimeMs / snapshot.speed.toLong().coerceAtLeast(1)).coerceAtLeast(50)
+                    delay(scaledDelayMs)
+
+                    // Log the simulated weight
+                    DebugLog.debug("AMA-308: Auto-selecting weight ${simulatedWeight ?: "null"} ${_uiState.value.weightUnit} for ${step.stepName}", TAG)
+                    logSetWeight(simulatedWeight, _uiState.value.weightUnit)
+                }
             }
         }
     }

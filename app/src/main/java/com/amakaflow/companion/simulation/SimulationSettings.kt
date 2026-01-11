@@ -38,12 +38,18 @@ class SimulationSettings @Inject constructor(
         private val GENERATE_HEALTH = booleanPreferencesKey("generate_health_data")
         private val RESTING_HR = intPreferencesKey("resting_hr")
         private val MAX_HR = intPreferencesKey("max_hr")
+        // AMA-308: Weight simulation settings
+        private val SIMULATE_WEIGHT = booleanPreferencesKey("simulate_weight")
+        private val WEIGHT_PROFILE = stringPreferencesKey("weight_profile")
 
         // Speed presets
         val SPEED_OPTIONS = listOf(1.0, 10.0, 30.0, 60.0)
 
         // Profile options
         val PROFILE_OPTIONS = listOf("efficient", "casual", "distracted")
+
+        // AMA-308: Weight profile options
+        val WEIGHT_PROFILE_OPTIONS = listOf("beginner", "intermediate", "advanced")
     }
 
     /**
@@ -75,6 +81,16 @@ class SimulationSettings @Inject constructor(
      * Custom max heart rate for HR simulation.
      */
     val maxHR: Flow<Int> = dataStore.data.map { it[MAX_HR] ?: 175 }
+
+    /**
+     * AMA-308: Whether to automatically select weights for strength exercises.
+     */
+    val simulateWeight: Flow<Boolean> = dataStore.data.map { it[SIMULATE_WEIGHT] ?: true }
+
+    /**
+     * AMA-308: Weight profile for simulated weights (beginner, intermediate, advanced).
+     */
+    val weightProfile: Flow<String> = dataStore.data.map { it[WEIGHT_PROFILE] ?: "intermediate" }
 
     /**
      * Enable or disable simulation mode.
@@ -119,6 +135,20 @@ class SimulationSettings @Inject constructor(
     }
 
     /**
+     * AMA-308: Enable or disable automatic weight selection.
+     */
+    suspend fun setSimulateWeight(enabled: Boolean) {
+        dataStore.edit { it[SIMULATE_WEIGHT] = enabled }
+    }
+
+    /**
+     * AMA-308: Set the weight profile (beginner, intermediate, advanced).
+     */
+    suspend fun setWeightProfile(profile: String) {
+        dataStore.edit { it[WEIGHT_PROFILE] = profile }
+    }
+
+    /**
      * Get the UserBehaviorProfile for the current profile name.
      */
     fun getBehaviorProfile(name: String): UserBehaviorProfile = UserBehaviorProfile.fromName(name)
@@ -145,7 +175,9 @@ class SimulationSettings @Inject constructor(
             profileName = prefs[PROFILE] ?: "casual",
             generateHealthData = prefs[GENERATE_HEALTH] ?: true,
             restingHR = prefs[RESTING_HR] ?: 70,
-            maxHR = prefs[MAX_HR] ?: 175
+            maxHR = prefs[MAX_HR] ?: 175,
+            simulateWeight = prefs[SIMULATE_WEIGHT] ?: true,
+            weightProfile = prefs[WEIGHT_PROFILE] ?: "intermediate"
         )
     }
 }
@@ -159,7 +191,10 @@ data class SimulationSnapshot(
     val profileName: String,
     val generateHealthData: Boolean,
     val restingHR: Int,
-    val maxHR: Int
+    val maxHR: Int,
+    // AMA-308: Weight simulation settings
+    val simulateWeight: Boolean,
+    val weightProfile: String
 ) {
     /**
      * Get the behavior profile for this snapshot.
@@ -172,4 +207,10 @@ data class SimulationSnapshot(
      */
     val hrProfile: HRProfile
         get() = HRProfile.custom(restingHR, maxHR)
+
+    /**
+     * AMA-308: Get the weight profile enum for this snapshot.
+     */
+    val weightProfileEnum: WeightProfile
+        get() = WeightProfile.fromName(weightProfile)
 }
