@@ -32,13 +32,26 @@ interface AmakaflowApi {
     suspend fun getScheduledWorkouts(): Response<List<ScheduledWorkout>>
 
     /**
-     * Fetch workouts pushed to Android Companion App
+     * Fetch workouts pushed to Android Companion App (using new sync queue endpoint)
+     * AMA-307: Uses /sync/pending for proper sync state tracking
      */
-    @GET("android-companion/pending")
+    @GET("sync/pending")
     suspend fun getPushedWorkouts(
-        @Query("limit") limit: Int = 50,
-        @Query("exclude_completed") excludeCompleted: Boolean = true
+        @Query("device_type") deviceType: String = "android",
+        @Query("limit") limit: Int = 50
     ): Response<PushedWorkoutsResponse>
+
+    /**
+     * Confirm successful workout sync (AMA-307)
+     */
+    @POST("sync/confirm")
+    suspend fun confirmSync(@Body request: ConfirmSyncRequest): Response<SyncStatusResponse>
+
+    /**
+     * Report failed workout sync (AMA-307)
+     */
+    @POST("sync/failed")
+    suspend fun reportSyncFailed(@Body request: ReportSyncFailedRequest): Response<SyncStatusResponse>
 
     /**
      * Get a specific workout by ID
