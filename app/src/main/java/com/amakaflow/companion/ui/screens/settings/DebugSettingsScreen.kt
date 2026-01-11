@@ -41,6 +41,9 @@ fun DebugSettingsScreen(
     val generateHealth by settings.generateHealthData.collectAsState(initial = true)
     val restingHR by settings.restingHR.collectAsState(initial = 70)
     val maxHR by settings.maxHR.collectAsState(initial = 175)
+    // AMA-308: Weight simulation settings
+    val simulateWeight by settings.simulateWeight.collectAsState(initial = true)
+    val weightProfile by settings.weightProfile.collectAsState(initial = "intermediate")
 
     Column(
         modifier = Modifier
@@ -137,6 +140,33 @@ fun DebugSettingsScreen(
                             maxHR = maxHR,
                             onRestingHRChange = { scope.launch { settings.setRestingHR(it) } },
                             onMaxHRChange = { scope.launch { settings.setMaxHR(it) } }
+                        )
+                    }
+                }
+
+                // AMA-308: WEIGHT SIMULATION section
+                item {
+                    Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+                    SectionHeader("WEIGHT SIMULATION")
+                }
+
+                item {
+                    ToggleSettingItem(
+                        icon = Icons.Filled.FitnessCenter,
+                        iconBackground = AmakaColors.accentOrange.copy(alpha = 0.2f),
+                        iconTint = AmakaColors.accentOrange,
+                        title = "Auto-Select Weights",
+                        subtitle = "Automatically select realistic weights for strength exercises",
+                        isEnabled = simulateWeight,
+                        onToggle = { scope.launch { settings.setSimulateWeight(it) } }
+                    )
+                }
+
+                if (simulateWeight) {
+                    item {
+                        WeightProfileSelector(
+                            selectedProfile = weightProfile,
+                            onProfileSelected = { scope.launch { settings.setWeightProfile(it) } }
                         )
                     }
                 }
@@ -528,6 +558,127 @@ private fun HRProfileSettings(
                     activeTrackColor = AmakaColors.accentRed,
                     inactiveTrackColor = AmakaColors.borderLight
                 )
+            )
+        }
+    }
+}
+
+/**
+ * AMA-308: Weight profile selector for simulated weight ranges.
+ */
+@Composable
+private fun WeightProfileSelector(
+    selectedProfile: String,
+    onProfileSelected: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = AmakaColors.surface,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AmakaSpacing.md.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(40.dp),
+                    color = AmakaColors.accentOrange.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.FitnessCenter,
+                            contentDescription = null,
+                            tint = AmakaColors.accentOrange,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(AmakaSpacing.md.dp))
+                Column {
+                    Text(
+                        text = "Strength Level",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = AmakaColors.textPrimary
+                    )
+                    Text(
+                        text = "Determines simulated weight ranges",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AmakaColors.textSecondary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+
+            // Profile chips
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AmakaSpacing.sm.dp)
+            ) {
+                WeightProfileChip(
+                    label = "Beginner",
+                    description = "~95-135 lbs",
+                    isSelected = selectedProfile == "beginner",
+                    onClick = { onProfileSelected("beginner") },
+                    modifier = Modifier.weight(1f)
+                )
+                WeightProfileChip(
+                    label = "Intermediate",
+                    description = "~185-275 lbs",
+                    isSelected = selectedProfile == "intermediate",
+                    onClick = { onProfileSelected("intermediate") },
+                    modifier = Modifier.weight(1f)
+                )
+                WeightProfileChip(
+                    label = "Advanced",
+                    description = "~315-495 lbs",
+                    isSelected = selectedProfile == "advanced",
+                    onClick = { onProfileSelected("advanced") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeightProfileChip(
+    label: String,
+    description: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(AmakaCornerRadius.md.dp))
+            .clickable(onClick = onClick),
+        color = if (isSelected) AmakaColors.accentOrange else AmakaColors.background,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(AmakaSpacing.sm.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isSelected) AmakaColors.textPrimary else AmakaColors.textSecondary
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isSelected) AmakaColors.textPrimary.copy(alpha = 0.7f) else AmakaColors.textTertiary
             )
         }
     }
