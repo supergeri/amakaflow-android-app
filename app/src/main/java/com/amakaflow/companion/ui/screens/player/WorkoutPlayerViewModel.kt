@@ -648,8 +648,8 @@ class WorkoutPlayerViewModel @Inject constructor(
         }
     }
 
-    // AMA-287: Build SetLog list for completion submission
-    private fun buildSetLogsForSubmission(allSteps: List<FlattenedInterval>): List<SetLog> {
+    // AMA-287: Build ExerciseSetLog list for completion submission
+    private fun buildSetLogsForSubmission(allSteps: List<FlattenedInterval>): List<ExerciseSetLog> {
         // Group set entries by exercise name and calculate exercise index
         val exerciseIndices = mutableMapOf<String, Int>()
         var currentIndex = 0
@@ -667,7 +667,7 @@ class WorkoutPlayerViewModel @Inject constructor(
             val exerciseIndex = exerciseIndices[exerciseName] ?: return@mapNotNull null
             if (entries.isEmpty()) return@mapNotNull null
 
-            SetLog(
+            ExerciseSetLog(
                 exerciseName = exerciseName,
                 exerciseIndex = exerciseIndex,
                 sets = entries.toList()

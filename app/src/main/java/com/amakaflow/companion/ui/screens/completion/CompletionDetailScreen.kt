@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.amakaflow.companion.data.model.CompletionSource
+import com.amakaflow.companion.data.model.IntervalLog
+import com.amakaflow.companion.data.model.IntervalStatus
+import com.amakaflow.companion.data.model.SetLog
 import com.amakaflow.companion.data.model.WorkoutCompletionDetail
 import com.amakaflow.companion.data.model.WorkoutIntervalSubmission
 import com.amakaflow.companion.ui.theme.AmakaColors
@@ -305,9 +308,17 @@ private fun CompletionDetailContent(
             }
         }
 
+        // AMA-292: Exercises section (from execution_log) - shows actual execution data
+        if (completion.hasExecutionLog) {
+            item {
+                ExercisesSection(completion = completion)
+            }
+        }
+
         // Workout Breakdown section (hierarchical like web app - AMA-264)
+        // Only show if no execution log (fallback to planned structure)
         val workoutSteps = completion.workoutStructure
-        if (!workoutSteps.isNullOrEmpty()) {
+        if (!workoutSteps.isNullOrEmpty() && !completion.hasExecutionLog) {
             item {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -753,3 +764,266 @@ private val CompletionSource.displayName: String
         CompletionSource.PHONE -> "Phone"
         CompletionSource.WEAR_OS -> "Wear OS"
     }
+
+// =============================================================================
+// AMA-292: Exercises Section (from execution_log)
+// =============================================================================
+
+/**
+ * Display exercises from execution_log with sets, weights, and status indicators.
+ * Groups consecutive intervals by exercise name (iOS sends one interval per set).
+ */
+@Composable
+private fun ExercisesSection(completion: WorkoutCompletionDetail) {
+    val executionLog = completion.executionLog ?: return
+    val intervals = executionLog.intervals
+
+    // Group consecutive intervals by planned_name (like web UI does)
+    data class GroupedExercise(
+        val name: String,
+        val status: IntervalStatus,
+        val sets: List<Pair<SetLog, Int?>>  // Pair of set and interval duration
+    )
+
+    val groupedExercises = mutableListOf<GroupedExercise>()
+    var currentGroup: GroupedExercise? = null
+
+    intervals.filter { it.plannedKind == "reps" }.forEach { interval ->
+        val name = interval.plannedName ?: "Unknown Exercise"
+        val sets = interval.sets ?: emptyList()
+
+        if (currentGroup != null && currentGroup!!.name == name) {
+            // Add sets to current group with renumbered set_number
+            val existingSets = currentGroup!!.sets.toMutableList()
+            sets.forEach { set ->
+                val nextSetNumber = existingSets.size + 1
+                existingSets.add(Pair(set.copy(setNumber = nextSetNumber), interval.actualDurationSeconds))
+            }
+            currentGroup = currentGroup!!.copy(sets = existingSets)
+        } else {
+            // Start a new group
+            if (currentGroup != null) {
+                groupedExercises.add(currentGroup!!)
+            }
+            currentGroup = GroupedExercise(
+                name = name,
+                status = interval.status,
+                sets = sets.mapIndexed { idx, set ->
+                    Pair(set.copy(setNumber = idx + 1), interval.actualDurationSeconds)
+                }
+            )
+        }
+    }
+    // Don't forget the last group
+    if (currentGroup != null) {
+        groupedExercises.add(currentGroup!!)
+    }
+
+    if (groupedExercises.isEmpty()) return
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = AmakaColors.surface,
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Column(modifier = Modifier.padding(AmakaSpacing.md.dp)) {
+            Text(
+                text = "Exercises",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = AmakaColors.textPrimary
+            )
+
+            Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+
+            // Table header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = AmakaSpacing.sm.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Set",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AmakaColors.textTertiary,
+                    modifier = Modifier.width(40.dp)
+                )
+                Text(
+                    text = "Reps",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AmakaColors.textTertiary,
+                    modifier = Modifier.width(60.dp)
+                )
+                Text(
+                    text = "Time",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AmakaColors.textTertiary,
+                    modifier = Modifier.width(60.dp)
+                )
+                Text(
+                    text = "Weight",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AmakaColors.textTertiary,
+                    modifier = Modifier.width(70.dp)
+                )
+                Spacer(modifier = Modifier.width(24.dp))  // Status icon space
+            }
+
+            HorizontalDivider(color = AmakaColors.borderLight)
+
+            // Exercise groups
+            groupedExercises.forEachIndexed { exerciseIdx, exercise ->
+                Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+
+                // Exercise name row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Exercise number badge
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(AmakaColors.accentPurple),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${exerciseIdx + 1}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 10.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+                    Text(
+                        text = exercise.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = AmakaColors.textPrimary
+                    )
+                }
+
+                // Sets for this exercise
+                exercise.sets.forEach { (set, intervalDuration) ->
+                    Spacer(modifier = Modifier.height(AmakaSpacing.xs.dp))
+                    SetRow(set = set, intervalDuration = intervalDuration)
+                }
+
+                if (exerciseIdx < groupedExercises.size - 1) {
+                    Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+                    HorizontalDivider(color = AmakaColors.borderLight.copy(alpha = 0.5f))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Display a single set row with reps, time, weight, and status.
+ */
+@Composable
+private fun SetRow(set: SetLog, intervalDuration: Int?) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 28.dp),  // Indent under exercise name
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        // Set number
+        Text(
+            text = "${set.setNumber}",
+            style = MaterialTheme.typography.bodySmall,
+            color = AmakaColors.textSecondary,
+            modifier = Modifier.width(40.dp)
+        )
+
+        // Reps (planned/completed)
+        val repsText = when {
+            set.repsPlanned != null && set.repsCompleted != null ->
+                "${set.repsCompleted}/${set.repsPlanned}"
+            set.repsCompleted != null -> "${set.repsCompleted}"
+            set.repsPlanned != null -> "${set.repsPlanned}"
+            else -> "----"
+        }
+        Text(
+            text = repsText,
+            style = MaterialTheme.typography.bodySmall,
+            color = AmakaColors.textPrimary,
+            modifier = Modifier.width(60.dp)
+        )
+
+        // Time - use set duration or fall back to interval duration
+        val durationSeconds = set.durationSeconds ?: intervalDuration
+        val timeText = durationSeconds?.let { formatSetTime(it) } ?: "----"
+        Text(
+            text = timeText,
+            style = MaterialTheme.typography.bodySmall,
+            color = AmakaColors.textSecondary,
+            modifier = Modifier.width(60.dp)
+        )
+
+        // Weight
+        val weightText = set.weight?.displayLabel ?: "----"
+        Text(
+            text = weightText,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            color = AmakaColors.textPrimary,
+            modifier = Modifier.width(70.dp)
+        )
+
+        // Status icon
+        SetStatusIcon(status = set.status, modifier = Modifier.size(20.dp))
+    }
+}
+
+/**
+ * Status icon for a set (completed, skipped, not reached)
+ */
+@Composable
+private fun SetStatusIcon(status: IntervalStatus, modifier: Modifier = Modifier) {
+    when (status) {
+        IntervalStatus.COMPLETED -> {
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = "Completed",
+                tint = AmakaColors.accentGreen,
+                modifier = modifier
+            )
+        }
+        IntervalStatus.SKIPPED -> {
+            Icon(
+                imageVector = Icons.Filled.SkipNext,
+                contentDescription = "Skipped",
+                tint = AmakaColors.accentOrange,
+                modifier = modifier
+            )
+        }
+        IntervalStatus.NOT_REACHED -> {
+            Icon(
+                imageVector = Icons.Filled.RadioButtonUnchecked,
+                contentDescription = "Not reached",
+                tint = AmakaColors.textTertiary,
+                modifier = modifier
+            )
+        }
+    }
+}
+
+/**
+ * Format seconds to a readable time string for sets
+ */
+private fun formatSetTime(seconds: Int): String {
+    return when {
+        seconds >= 60 -> {
+            val min = seconds / 60
+            val sec = seconds % 60
+            if (sec > 0) "${min}:${String.format("%02d", sec)}" else "${min}m"
+        }
+        else -> "${seconds}s"
+    }
+}
