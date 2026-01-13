@@ -7,9 +7,7 @@ import com.amakaflow.companion.data.model.*
 import com.amakaflow.companion.data.repository.Result
 import com.amakaflow.companion.data.repository.WorkoutRepository
 import com.amakaflow.companion.debug.DebugLog
-import com.amakaflow.companion.simulation.SimulatedWeightProvider
-import com.amakaflow.companion.simulation.SimulationSettings
-import com.amakaflow.companion.simulation.random
+import com.amakaflow.companion.simulation.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -114,6 +112,11 @@ class WorkoutPlayerViewModel @Inject constructor(
     private val setLogs = mutableMapOf<String, MutableList<SetEntry>>() // exercise name -> set entries
     private var lastLoggedWeights = mutableMapOf<String, Double>() // exercise name -> last weight
 
+    // AMA-291: Simulation state tracking
+    private var simulationSnapshot: SimulationSnapshot? = null
+    private var simulatedHealthProvider: SimulatedHealthProvider? = null
+    private var virtualElapsedSeconds: Int = 0 // Virtual time passed at normal speed
+
     init {
         loadWorkout()
     }
@@ -162,6 +165,20 @@ class WorkoutPlayerViewModel @Inject constructor(
         DebugLog.info("Starting workout: ${currentState.workout?.name}", TAG)
         timerJob?.cancel()
         workoutStartTime = Clock.System.now()
+        virtualElapsedSeconds = 0
+
+        // AMA-291: Initialize simulation state
+        viewModelScope.launch {
+            val snapshot = simulationSettings.getSnapshot()
+            simulationSnapshot = snapshot
+
+            if (snapshot.isEnabled && snapshot.generateHealthData) {
+                // Create health provider with accelerated clock for proper timestamps
+                val clock = AcceleratedClock(snapshot.speed, workoutStartTime!!)
+                simulatedHealthProvider = SimulatedHealthProvider(snapshot.hrProfile, clock)
+                DebugLog.info("AMA-291: Initialized SimulatedHealthProvider (speed=${snapshot.speed}x)", TAG)
+            }
+        }
 
         _uiState.update {
             it.copy(
@@ -325,6 +342,9 @@ class WorkoutPlayerViewModel @Inject constructor(
 
         val step = _uiState.value.currentStep ?: return
 
+        // AMA-291: Simulate health data for this step
+        simulateHealthForStep(step)
+
         // AMA-287: Calculate set number and total sets for reps exercises
         val (setNumber, totalSets, suggestedWeight) = if (step.stepType == StepType.REPS) {
             calculateSetInfo(step)
@@ -410,6 +430,36 @@ class WorkoutPlayerViewModel @Inject constructor(
         return Triple(setNumber, totalSets, suggestedWeight)
     }
 
+    // AMA-291: Simulate health data for a workout step
+    private fun simulateHealthForStep(step: FlattenedInterval) {
+        val provider = simulatedHealthProvider ?: return
+        val durationSeconds = step.durationSeconds?.toDouble() ?: 30.0 // Default 30s for reps exercises
+
+        // Determine intensity based on step type
+        val intensity = when (step.stepType) {
+            StepType.REST -> ExerciseIntensity.REST
+            StepType.WARMUP -> ExerciseIntensity.LOW
+            StepType.REPS -> ExerciseIntensity.MODERATE
+            StepType.WORK -> ExerciseIntensity.HIGH
+            else -> ExerciseIntensity.MODERATE
+        }
+
+        // Generate health data for this step
+        if (step.stepType == StepType.REST) {
+            provider.simulateRest(durationSeconds)
+        } else {
+            provider.simulateWork(durationSeconds, intensity)
+        }
+
+        DebugLog.debug("AMA-291: Simulated ${step.stepType} for ${durationSeconds}s, HR=${provider.currentHR}", TAG)
+    }
+
+    // AMA-291: Calculate virtual elapsed time increment based on simulation speed
+    private fun getVirtualTimeIncrement(): Int {
+        val snapshot = simulationSnapshot ?: return 1
+        return if (snapshot.isEnabled) snapshot.speed.toInt().coerceAtLeast(1) else 1
+    }
+
     private fun startTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
@@ -425,14 +475,21 @@ class WorkoutPlayerViewModel @Inject constructor(
         timerJob = viewModelScope.launch {
             while (isActive) {
                 delay(1000)
-                _uiState.update { it.copy(elapsedSeconds = it.elapsedSeconds + 1) }
+                // AMA-291: Increment by virtual time in simulation mode
+                val increment = getVirtualTimeIncrement()
+                virtualElapsedSeconds += increment
+                _uiState.update { it.copy(elapsedSeconds = virtualElapsedSeconds) }
             }
         }
     }
 
     private fun timerTick() {
         val currentState = _uiState.value
-        _uiState.update { it.copy(elapsedSeconds = it.elapsedSeconds + 1) }
+
+        // AMA-291: Increment by virtual time in simulation mode
+        val increment = getVirtualTimeIncrement()
+        virtualElapsedSeconds += increment
+        _uiState.update { it.copy(elapsedSeconds = virtualElapsedSeconds) }
 
         if (currentState.remainingSeconds <= 0) {
             // For reps-based, don't auto-advance
@@ -476,13 +533,20 @@ class WorkoutPlayerViewModel @Inject constructor(
     }
 
     private fun startRestTimer() {
+        // AMA-291: Simulate rest health data
+        val restDuration = _uiState.value.restRemainingSeconds
+        simulatedHealthProvider?.simulateRest(restDuration.toDouble())
+
         timerJob = viewModelScope.launch {
             while (_uiState.value.restRemainingSeconds > 0 && isActive) {
                 delay(1000)
+                // AMA-291: Increment by virtual time in simulation mode
+                val increment = getVirtualTimeIncrement()
+                virtualElapsedSeconds += increment
                 _uiState.update {
                     it.copy(
                         restRemainingSeconds = it.restRemainingSeconds - 1,
-                        elapsedSeconds = it.elapsedSeconds + 1
+                        elapsedSeconds = virtualElapsedSeconds
                     )
                 }
             }
@@ -536,23 +600,35 @@ class WorkoutPlayerViewModel @Inject constructor(
                 val allSteps = _uiState.value.flattenedSteps
                 val setLogsForSubmission = buildSetLogsForSubmission(allSteps)
 
+                // AMA-291: Get simulated health data if available
+                val healthData = simulatedHealthProvider?.getCollectedData()
+                val isSimulated = simulationSnapshot?.isEnabled ?: false
+
+                // AMA-291: Calculate proper end time based on virtual duration
+                val virtualEndedAt = Instant.fromEpochMilliseconds(
+                    startedAt.toEpochMilliseconds() + (durationSeconds * 1000L)
+                )
+
+                DebugLog.info("AMA-291: Posting completion - duration=${durationSeconds}s, " +
+                    "simulated=$isSimulated, healthData=${healthData != null}", TAG)
+
                 val submission = WorkoutCompletionSubmission(
                     workoutId = workoutId,
                     workoutName = workoutName ?: "Workout",
                     startedAt = startedAt,
-                    endedAt = Clock.System.now(),
+                    endedAt = virtualEndedAt,
                     source = CompletionSource.PHONE,
                     healthMetrics = HealthMetrics(
-                        avgHeartRate = null,
-                        maxHeartRate = null,
-                        minHeartRate = null,
-                        activeCalories = null,
-                        totalCalories = null,
+                        avgHeartRate = healthData?.avgHR,
+                        maxHeartRate = healthData?.maxHR,
+                        minHeartRate = healthData?.minHR,
+                        activeCalories = healthData?.calories,
+                        totalCalories = healthData?.calories,
                         distanceMeters = null,
-                        steps = null
+                        steps = healthData?.steps
                     ),
                     workoutStructure = intervals?.map { it.toSubmissionInterval() },
-                    isSimulated = simulationSettings.isEnabledSync(),
+                    isSimulated = isSimulated,
                     setLogs = setLogsForSubmission.ifEmpty { null }
                 )
                 val result = workoutRepository.completeWorkout(submission)
@@ -602,5 +678,8 @@ class WorkoutPlayerViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         timerJob?.cancel()
+        // AMA-291: Clean up simulation state
+        simulatedHealthProvider = null
+        simulationSnapshot = null
     }
 }
