@@ -19,3 +19,26 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Google Tink crypto library - missing error prone annotations (compile-time only)
+-dontwarn com.google.errorprone.annotations.**
+
+# Keep Kotlin serialization
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+
+-keepclassmembers class kotlinx.serialization.json.** {
+    *** Companion;
+}
+-keepclasseswithmembers class kotlinx.serialization.json.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# Keep serializable classes
+-keep,includedescriptorclasses class com.amakaflow.companion.**$$serializer { *; }
+-keepclassmembers class com.amakaflow.companion.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.amakaflow.companion.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
