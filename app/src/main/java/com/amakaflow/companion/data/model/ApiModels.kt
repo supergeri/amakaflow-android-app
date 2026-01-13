@@ -127,10 +127,10 @@ data class SetEntry(
 )
 
 /**
- * AMA-287: Exercise set log for weight tracking
+ * AMA-287: Exercise set log for weight tracking during submission
  */
 @Serializable
-data class SetLog(
+data class ExerciseSetLog(
     @SerialName("exercise_name")
     val exerciseName: String,
     @SerialName("exercise_index")
@@ -161,7 +161,7 @@ data class WorkoutCompletionSubmission(
     @SerialName("is_simulated")
     val isSimulated: Boolean = false,
     @SerialName("set_logs")
-    val setLogs: List<SetLog>? = null
+    val setLogs: List<ExerciseSetLog>? = null
 )
 
 /**
@@ -217,6 +217,121 @@ data class CompletionDeviceInfo(
         }
 }
 
+// =============================================================================
+// Execution Log Models (AMA-292)
+// =============================================================================
+
+/**
+ * Status of an interval or set execution
+ */
+@Serializable
+enum class IntervalStatus {
+    @SerialName("completed") COMPLETED,
+    @SerialName("skipped") SKIPPED,
+    @SerialName("not_reached") NOT_REACHED
+}
+
+/**
+ * Weight component for detailed weight tracking
+ */
+@Serializable
+data class WeightComponent(
+    val source: String,
+    val value: Double? = null,
+    val unit: String? = null
+)
+
+/**
+ * Weight entry with components and display label
+ */
+@Serializable
+data class WeightEntry(
+    val components: List<WeightComponent> = emptyList(),
+    @SerialName("display_label")
+    val displayLabel: String
+)
+
+/**
+ * Execution data for a single set within an interval
+ */
+@Serializable
+data class SetLog(
+    @SerialName("set_number")
+    val setNumber: Int,
+    val status: IntervalStatus = IntervalStatus.COMPLETED,
+    @SerialName("duration_seconds")
+    val durationSeconds: Int? = null,
+    @SerialName("reps_planned")
+    val repsPlanned: Int? = null,
+    @SerialName("reps_completed")
+    val repsCompleted: Int? = null,
+    val weight: WeightEntry? = null,
+    val rpe: Int? = null,
+    val modified: Boolean? = null,
+    @SerialName("skip_reason")
+    val skipReason: String? = null
+)
+
+/**
+ * Execution data for a single interval
+ */
+@Serializable
+data class IntervalLog(
+    @SerialName("interval_index")
+    val intervalIndex: Int,
+    @SerialName("planned_name")
+    val plannedName: String? = null,
+    @SerialName("planned_kind")
+    val plannedKind: String? = null,
+    val status: IntervalStatus = IntervalStatus.COMPLETED,
+    @SerialName("planned_duration_seconds")
+    val plannedDurationSeconds: Int? = null,
+    @SerialName("actual_duration_seconds")
+    val actualDurationSeconds: Int? = null,
+    @SerialName("planned_sets")
+    val plannedSets: Int? = null,
+    @SerialName("planned_reps")
+    val plannedReps: Int? = null,
+    val sets: List<SetLog>? = null,
+    @SerialName("skip_reason")
+    val skipReason: String? = null
+)
+
+/**
+ * Summary statistics for execution log
+ */
+@Serializable
+data class ExecutionSummary(
+    @SerialName("total_intervals")
+    val totalIntervals: Int = 0,
+    val completed: Int = 0,
+    val skipped: Int = 0,
+    @SerialName("not_reached")
+    val notReached: Int = 0,
+    @SerialName("completion_percentage")
+    val completionPercentage: Double = 0.0,
+    @SerialName("total_sets")
+    val totalSets: Int = 0,
+    @SerialName("sets_completed")
+    val setsCompleted: Int = 0,
+    @SerialName("sets_skipped")
+    val setsSkipped: Int = 0,
+    @SerialName("total_duration_seconds")
+    val totalDurationSeconds: Int = 0,
+    @SerialName("active_duration_seconds")
+    val activeDurationSeconds: Int = 0
+)
+
+/**
+ * Full execution log structure (v2 format)
+ */
+@Serializable
+data class ExecutionLog(
+    val version: Int = 2,
+    val intervals: List<IntervalLog> = emptyList(),
+    val summary: ExecutionSummary? = null
+)
+
 /**
  * Extended workout completion detail
  */
@@ -256,8 +371,17 @@ data class WorkoutCompletionDetail(
     @SerialName("workout_id")
     val workoutId: String? = null,
     @SerialName("workout_structure")
-    val workoutStructure: List<WorkoutIntervalSubmission>? = null
+    val workoutStructure: List<WorkoutIntervalSubmission>? = null,
+    @SerialName("execution_log")
+    val executionLog: ExecutionLog? = null  // AMA-292: Actual execution data
 ) {
+    // AMA-292: Helper to check if we have execution log data
+    val hasExecutionLog: Boolean
+        get() = executionLog != null && executionLog.intervals.isNotEmpty()
+
+    // AMA-292: Get exercises from execution log (intervals with sets)
+    val exercises: List<IntervalLog>
+        get() = executionLog?.intervals?.filter { it.plannedKind == "reps" && !it.sets.isNullOrEmpty() } ?: emptyList()
     val resolvedEndedAt: Instant
         get() = endedAt ?: (startedAt + kotlin.time.Duration.parse("${durationSeconds}s"))
 
