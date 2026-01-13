@@ -435,17 +435,18 @@ class WorkoutPlayerViewModel @Inject constructor(
         val provider = simulatedHealthProvider ?: return
         val durationSeconds = step.durationSeconds?.toDouble() ?: 30.0 // Default 30s for reps exercises
 
-        // Determine intensity based on step type
-        val intensity = when (step.stepType) {
-            StepType.REST -> ExerciseIntensity.REST
-            StepType.WARMUP -> ExerciseIntensity.LOW
-            StepType.REPS -> ExerciseIntensity.MODERATE
-            StepType.WORK -> ExerciseIntensity.HIGH
-            else -> ExerciseIntensity.MODERATE
+        // Determine intensity based on interval type
+        val isRest = step.interval is WorkoutInterval.Rest
+        val intensity = when (step.interval) {
+            is WorkoutInterval.Rest -> ExerciseIntensity.REST
+            is WorkoutInterval.Warmup -> ExerciseIntensity.LOW
+            is WorkoutInterval.Cooldown -> ExerciseIntensity.LOW
+            is WorkoutInterval.Reps -> ExerciseIntensity.MODERATE
+            else -> ExerciseIntensity.HIGH // Time, Distance work intervals
         }
 
         // Generate health data for this step
-        if (step.stepType == StepType.REST) {
+        if (isRest) {
             provider.simulateRest(durationSeconds)
         } else {
             provider.simulateWork(durationSeconds, intensity)
