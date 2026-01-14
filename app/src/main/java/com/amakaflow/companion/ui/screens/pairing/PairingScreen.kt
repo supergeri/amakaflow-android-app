@@ -27,6 +27,7 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amakaflow.companion.BuildConfig
+import com.amakaflow.companion.data.AppEnvironment
 import com.amakaflow.companion.data.TestConfig
 import com.amakaflow.companion.ui.components.QRCodeScanner
 import com.amakaflow.companion.ui.theme.AmakaColors
@@ -45,6 +46,10 @@ fun PairingScreen(
     var showTestModeDialog by remember { mutableStateOf(false) }
     var testAuthSecret by remember { mutableStateOf("") }
     var testUserId by remember { mutableStateOf("") }
+
+    // Environment selector state (debug builds only)
+    var currentEnvironment by remember { mutableStateOf(testConfig.appEnvironment) }
+    var showEnvironmentDropdown by remember { mutableStateOf(false) }
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -204,17 +209,45 @@ fun PairingScreen(
             textAlign = TextAlign.Center
         )
 
-        // Developer testing option (debug builds only)
+        // Developer options (debug builds only)
         if (BuildConfig.DEBUG) {
             Spacer(modifier = Modifier.height(16.dp))
-            TextButton(
-                onClick = { showTestModeDialog = true }
-            ) {
-                Text(
-                    text = "Skip for E2E Testing",
-                    color = AmakaColors.accentOrange,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+
+            // Environment selector
+            Box {
+                TextButton(
+                    onClick = { showEnvironmentDropdown = true }
+                ) {
+                    Text(
+                        text = "Environment: ${currentEnvironment.displayName}",
+                        color = AmakaColors.accentOrange,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showEnvironmentDropdown,
+                    onDismissRequest = { showEnvironmentDropdown = false }
+                ) {
+                    AppEnvironment.entries.forEach { env ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = env.displayName,
+                                    color = if (env == currentEnvironment)
+                                        AmakaColors.accentBlue
+                                    else
+                                        AmakaColors.textPrimary
+                                )
+                            },
+                            onClick = {
+                                testConfig.appEnvironment = env
+                                currentEnvironment = env
+                                showEnvironmentDropdown = false
+                            }
+                        )
+                    }
+                }
             }
         }
 

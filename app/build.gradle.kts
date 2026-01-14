@@ -24,11 +24,9 @@ android {
         buildConfigField("String", "MAPPER_API_URL_PROD", "\"https://mapper-api.staging.amakaflow.com\"")
         buildConfigField("String", "MAPPER_API_URL_STAGING", "\"https://mapper-api.staging.amakaflow.com\"")
         buildConfigField("String", "MAPPER_API_URL_DEV", "\"http://10.0.2.2:8001\"")
-        buildConfigField("String", "MAPPER_API_URL_LOCALHOST", "\"http://localhost:8001\"")
         buildConfigField("String", "INGESTOR_API_URL_PROD", "\"https://workout-ingestor-api.staging.amakaflow.com\"")
         buildConfigField("String", "INGESTOR_API_URL_STAGING", "\"https://workout-ingestor-api.staging.amakaflow.com\"")
         buildConfigField("String", "INGESTOR_API_URL_DEV", "\"http://10.0.2.2:8002\"")
-        buildConfigField("String", "INGESTOR_API_URL_LOCALHOST", "\"http://localhost:8002\"")
     }
 
     buildTypes {
@@ -42,6 +40,7 @@ android {
         }
         debug {
             isMinifyEnabled = false
+            // Use STAGING to match device behavior (same backend as release)
             buildConfigField("String", "DEFAULT_ENVIRONMENT", "\"STAGING\"")
         }
     }
