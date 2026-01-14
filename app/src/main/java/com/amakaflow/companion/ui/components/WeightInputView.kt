@@ -58,26 +58,31 @@ fun WeightInputView(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = AmakaSpacing.lg.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Exercise name and set info
-        Text(
-            text = exerciseName.uppercase(),
-            style = MaterialTheme.typography.labelLarge,
-            color = AmakaColors.textSecondary,
-            fontWeight = FontWeight.SemiBold
-        )
+        // AMA-322: Content section (will be pushed to top by SpaceBetween)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Exercise name and set info
+            Text(
+                text = exerciseName.uppercase(),
+                style = MaterialTheme.typography.labelLarge,
+                color = AmakaColors.textSecondary,
+                fontWeight = FontWeight.SemiBold
+            )
 
-        Spacer(modifier = Modifier.height(AmakaSpacing.xs.dp))
+            Spacer(modifier = Modifier.height(AmakaSpacing.xs.dp))
 
-        Text(
-            text = "Set $setNumber/$totalSets",
-            style = MaterialTheme.typography.titleMedium,
-            color = AmakaColors.textPrimary,
-            fontWeight = FontWeight.Bold
-        )
+            Text(
+                text = "Set $setNumber/$totalSets",
+                style = MaterialTheme.typography.titleMedium,
+                color = AmakaColors.textPrimary,
+                fontWeight = FontWeight.Bold
+            )
 
-        Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
+            Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
 
         // Weight adjustment row
         Row(
@@ -161,11 +166,11 @@ fun WeightInputView(
                         Text(
                             text = formatWeight(weight),
                             style = MaterialTheme.typography.displayLarge.copy(
-                                fontSize = 56.sp,
+                                fontSize = 48.sp,  // AMA-322: Reduced from 56sp to save space
                                 fontWeight = FontWeight.Bold
                             ),
                             color = if (weight > 0) AmakaColors.accentBlue else AmakaColors.textTertiary,
-                            modifier = Modifier.padding(vertical = AmakaSpacing.sm.dp)
+                            modifier = Modifier.padding(vertical = AmakaSpacing.xs.dp)
                         )
                     }
                 }
@@ -212,10 +217,9 @@ fun WeightInputView(
                 )
             }
         }
+        } // End of content Column
 
-        Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
-
-        // Action buttons
+        // AMA-322: Action buttons (will be pushed to bottom by SpaceBetween)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(AmakaSpacing.md.dp)

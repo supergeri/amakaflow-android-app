@@ -4,9 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -244,128 +242,156 @@ private fun CurrentStepView(
 ) {
     if (step == null) return
 
-    // AMA-291: Use Box with centered content that can scroll if needed
-    // This ensures action buttons (SKIP/LOG SET) are visible on smaller screens
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(AmakaSpacing.lg.dp),
-        contentAlignment = Alignment.Center
-    ) {
+    // AMA-322: Different layouts for different step types
+    // REPS steps need special handling to ensure action buttons are always visible
+    if (step.stepType == StepType.REPS) {
+        // For REPS: Use Column layout that ensures buttons at bottom are visible
         Column(
             modifier = Modifier
-                .verticalScroll(rememberScrollState()),
+                .fillMaxSize()
+                .padding(horizontal = AmakaSpacing.lg.dp)
+                .padding(top = AmakaSpacing.md.dp, bottom = AmakaSpacing.sm.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-        // Step counter
-        Text(
-            text = "Step $stepIndex of $totalSteps",
-            style = MaterialTheme.typography.labelMedium,
-            color = AmakaColors.textTertiary
-        )
+            // Step counter
+            Text(
+                text = "Step $stepIndex of $totalSteps",
+                style = MaterialTheme.typography.labelMedium,
+                color = AmakaColors.textTertiary
+            )
 
-        Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+            Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
 
-        // Round info badge
-        step.roundInfo?.let { roundInfo ->
-            Surface(
-                color = AmakaColors.accentBlue.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(AmakaCornerRadius.sm.dp)
-            ) {
-                Text(
-                    text = roundInfo,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AmakaColors.accentBlue,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
-        }
-
-        // Timer or reps display
-        when (step.stepType) {
-            StepType.TIMED -> {
-                // Step name
-                Text(
-                    text = step.stepName,
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = AmakaColors.textPrimary,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
-
-                Text(
-                    text = remainingTime,
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontSize = 72.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = AmakaColors.accentGreen
-                )
-            }
-            StepType.REPS -> {
-                // AMA-287: Show weight input for reps exercises
-                // Display target reps first
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // Round info badge
+            step.roundInfo?.let { roundInfo ->
+                Surface(
+                    color = AmakaColors.accentBlue.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(AmakaCornerRadius.sm.dp)
+                ) {
                     Text(
-                        text = "${step.targetReps ?: 0}",
-                        style = MaterialTheme.typography.displayLarge.copy(
-                            fontSize = 56.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = AmakaColors.accentBlue
-                    )
-                    Text(
-                        text = "reps",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = AmakaColors.textSecondary
+                        text = roundInfo,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AmakaColors.accentBlue,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                     )
                 }
-
-                Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
-
-                // Weight input view
-                WeightInputView(
-                    exerciseName = step.stepName,
-                    setNumber = setNumber,
-                    totalSets = totalSetsForExercise,
-                    suggestedWeight = suggestedWeight,
-                    weightUnit = weightUnit,
-                    onLogSet = onLogSet,
-                    onSkipWeight = onSkipWeight
-                )
-            }
-            StepType.DISTANCE -> {
-                // Step name
-                Text(
-                    text = step.stepName,
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = AmakaColors.textPrimary,
-                    textAlign = TextAlign.Center
-                )
-
                 Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+            }
 
+            // Reps display (compact)
+            Text(
+                text = "${step.targetReps ?: 0}",
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = AmakaColors.accentBlue
+            )
+            Text(
+                text = "reps",
+                style = MaterialTheme.typography.titleMedium,
+                color = AmakaColors.textSecondary
+            )
+
+            Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+
+            // Weight input view - takes remaining space
+            WeightInputView(
+                exerciseName = step.stepName,
+                setNumber = setNumber,
+                totalSets = totalSetsForExercise,
+                suggestedWeight = suggestedWeight,
+                weightUnit = weightUnit,
+                onLogSet = onLogSet,
+                onSkipWeight = onSkipWeight,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    } else {
+        // For TIMED/DISTANCE: Use centered Box layout
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(AmakaSpacing.lg.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Step counter
                 Text(
-                    text = step.stepName,
-                    style = MaterialTheme.typography.displayMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = AmakaColors.accentOrange
+                    text = "Step $stepIndex of $totalSteps",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = AmakaColors.textTertiary
                 )
-            }
-        }
 
-        // Coming up next (only show for non-reps, since reps has weight input)
-        if (step.stepType != StepType.REPS) {
-            nextStep?.let { next ->
-                Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
-                ComingUpView(nextStep = next)
+                Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+
+                // Round info badge
+                step.roundInfo?.let { roundInfo ->
+                    Surface(
+                        color = AmakaColors.accentBlue.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(AmakaCornerRadius.sm.dp)
+                    ) {
+                        Text(
+                            text = roundInfo,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AmakaColors.accentBlue,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
+                }
+
+                when (step.stepType) {
+                    StepType.TIMED -> {
+                        Text(
+                            text = step.stepName,
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = AmakaColors.textPrimary,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+
+                        Text(
+                            text = remainingTime,
+                            style = MaterialTheme.typography.displayLarge.copy(
+                                fontSize = 72.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = AmakaColors.accentGreen
+                        )
+                    }
+                    StepType.DISTANCE -> {
+                        Text(
+                            text = step.stepName,
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = AmakaColors.textPrimary,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(AmakaSpacing.sm.dp))
+
+                        Text(
+                            text = step.stepName,
+                            style = MaterialTheme.typography.displayMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = AmakaColors.accentOrange
+                        )
+                    }
+                    else -> { /* REPS handled above */ }
+                }
+
+                // Coming up next
+                nextStep?.let { next ->
+                    Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
+                    ComingUpView(nextStep = next)
+                }
             }
-        }
         }
     }
 }
