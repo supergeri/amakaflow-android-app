@@ -15,18 +15,18 @@ android {
         applicationId = "com.amakaflow.companion"
         minSdk = 28
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Build config fields for API endpoints
-        buildConfigField("String", "MAPPER_API_URL_PROD", "\"https://mapper.amakaflow.com\"")
+        buildConfigField("String", "MAPPER_API_URL_PROD", "\"https://mapper-api.staging.amakaflow.com\"")
         buildConfigField("String", "MAPPER_API_URL_STAGING", "\"https://mapper-api.staging.amakaflow.com\"")
         buildConfigField("String", "MAPPER_API_URL_DEV", "\"http://10.0.2.2:8001\"")
         buildConfigField("String", "MAPPER_API_URL_LOCALHOST", "\"http://localhost:8001\"")
-        buildConfigField("String", "INGESTOR_API_URL_PROD", "\"https://ingestor.amakaflow.com\"")
-        buildConfigField("String", "INGESTOR_API_URL_STAGING", "\"https://ingestor-api.staging.amakaflow.com\"")
+        buildConfigField("String", "INGESTOR_API_URL_PROD", "\"https://workout-ingestor-api.staging.amakaflow.com\"")
+        buildConfigField("String", "INGESTOR_API_URL_STAGING", "\"https://workout-ingestor-api.staging.amakaflow.com\"")
         buildConfigField("String", "INGESTOR_API_URL_DEV", "\"http://10.0.2.2:8002\"")
         buildConfigField("String", "INGESTOR_API_URL_LOCALHOST", "\"http://localhost:8002\"")
     }
