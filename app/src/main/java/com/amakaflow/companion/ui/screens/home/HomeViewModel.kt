@@ -9,6 +9,7 @@ import com.amakaflow.companion.data.repository.PairingRepository
 import com.amakaflow.companion.data.repository.Result
 import com.amakaflow.companion.data.repository.WorkoutRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -33,10 +34,36 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    private var localWorkoutsJob: Job? = null
+
     init {
         loadData()
         loadWeeklyStats()
         observeUserProfile()
+        observeLocalWorkouts()
+    }
+
+    /**
+     * AMA-320: Observe local workouts from Room database.
+     * This ensures workouts persist even after server filters synced workouts.
+     */
+    private fun observeLocalWorkouts() {
+        localWorkoutsJob?.cancel()
+        localWorkoutsJob = viewModelScope.launch {
+            workoutRepository.getLocalPushedWorkouts().collect { localWorkouts ->
+                Log.d(TAG, "observeLocalWorkouts: ${localWorkouts.size} local workouts available")
+                // Only update if we currently have no workouts (API returned empty)
+                if (_uiState.value.todayWorkouts.isEmpty() && localWorkouts.isNotEmpty()) {
+                    Log.d(TAG, "observeLocalWorkouts: Using local workouts since API returned empty")
+                    _uiState.update {
+                        it.copy(
+                            todayWorkouts = localWorkouts,
+                            upcomingWorkouts = localWorkouts
+                        )
+                    }
+                }
+            }
+        }
     }
 
     private fun observeUserProfile() {
@@ -59,12 +86,24 @@ class HomeViewModel @Inject constructor(
                         _uiState.update { it.copy(isLoading = true, error = null) }
                     }
                     is Result.Success -> {
-                        Log.d(TAG, "loadData: Success! Found ${result.data.size} workouts: ${result.data.map { it.name }}")
+                        Log.d(TAG, "loadData: Success! Found ${result.data.size} workouts from API: ${result.data.map { it.name }}")
+
+                        // AMA-320: If API returns empty (server filtered synced workouts),
+                        // fall back to local storage
+                        val workoutsToShow = if (result.data.isEmpty()) {
+                            Log.d(TAG, "loadData: API returned empty, checking local storage")
+                            val localWorkouts = workoutRepository.getLocalPushedWorkoutsSync()
+                            Log.d(TAG, "loadData: Found ${localWorkouts.size} local workouts")
+                            localWorkouts
+                        } else {
+                            result.data
+                        }
+
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
-                                todayWorkouts = result.data,
-                                upcomingWorkouts = result.data,
+                                todayWorkouts = workoutsToShow,
+                                upcomingWorkouts = workoutsToShow,
                                 error = null
                             )
                         }
@@ -72,10 +111,15 @@ class HomeViewModel @Inject constructor(
                     }
                     is Result.Error -> {
                         Log.e(TAG, "loadData: Error - ${result.message}")
+                        // AMA-320: On error, try to show local workouts
+                        val localWorkouts = workoutRepository.getLocalPushedWorkoutsSync()
+                        Log.d(TAG, "loadData: Error occurred, falling back to ${localWorkouts.size} local workouts")
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
-                                error = result.message
+                                todayWorkouts = localWorkouts,
+                                upcomingWorkouts = localWorkouts,
+                                error = if (localWorkouts.isEmpty()) result.message else null
                             )
                         }
                     }

@@ -1,6 +1,9 @@
 package com.amakaflow.companion.data.repository
 
+import android.util.Log
 import com.amakaflow.companion.data.api.AmakaflowApi
+import com.amakaflow.companion.data.local.PushedWorkoutDao
+import com.amakaflow.companion.data.local.WorkoutEntityMapper
 import com.amakaflow.companion.data.model.ConfirmSyncRequest
 import com.amakaflow.companion.data.model.ReportSyncFailedRequest
 import com.amakaflow.companion.data.model.Workout
@@ -10,6 +13,7 @@ import com.amakaflow.companion.data.model.WorkoutCompletionSubmission
 import com.amakaflow.companion.debug.DebugLog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,10 +35,15 @@ data class CompletionsResult(
 
 @Singleton
 class WorkoutRepository @Inject constructor(
-    private val api: AmakaflowApi
+    private val api: AmakaflowApi,
+    private val pushedWorkoutDao: PushedWorkoutDao
 ) {
     // In-memory cache of workouts for quick lookup
     private val workoutCache = mutableMapOf<String, Workout>()
+
+    companion object {
+        private const val REPO_TAG = "WorkoutRepository"
+    }
 
     /**
      * Cache workouts for later lookup by ID
@@ -86,6 +95,14 @@ class WorkoutRepository @Inject constructor(
                 if (body.success) {
                     // Cache workouts for later lookup by ID
                     cacheWorkouts(body.workouts)
+
+                    // AMA-320: Store workouts in Room for local persistence
+                    if (body.workouts.isNotEmpty()) {
+                        Log.d(REPO_TAG, "Storing ${body.workouts.size} workouts in local database")
+                        val entities = WorkoutEntityMapper.toEntities(body.workouts)
+                        pushedWorkoutDao.upsertAll(entities)
+                    }
+
                     DebugLog.success("Fetched ${body.workouts.size} pushed workout(s)", TAG)
                     emit(Result.Success(body.workouts))
                 } else {
@@ -102,15 +119,63 @@ class WorkoutRepository @Inject constructor(
         }
     }
 
+    /**
+     * Get locally stored pushed workouts (AMA-320)
+     * Returns workouts from Room database regardless of server sync status.
+     * Use this to display workouts that have been synced with the server
+     * (which filters them from getPushedWorkouts response).
+     */
+    fun getLocalPushedWorkouts(): Flow<List<Workout>> {
+        Log.d(REPO_TAG, "Getting local pushed workouts from Room")
+        return pushedWorkoutDao.getActiveWorkouts().map { entities ->
+            Log.d(REPO_TAG, "Found ${entities.size} local workouts")
+            WorkoutEntityMapper.toWorkouts(entities)
+        }
+    }
+
+    /**
+     * Get locally stored pushed workouts synchronously (AMA-320)
+     */
+    suspend fun getLocalPushedWorkoutsSync(): List<Workout> {
+        val entities = pushedWorkoutDao.getActiveWorkoutsSync()
+        Log.d(REPO_TAG, "Found ${entities.size} local workouts (sync)")
+        return WorkoutEntityMapper.toWorkouts(entities)
+    }
+
+    /**
+     * Get a specific workout from local storage (AMA-320)
+     */
+    suspend fun getLocalWorkout(workoutId: String): Workout? {
+        val entity = pushedWorkoutDao.getById(workoutId)
+        return entity?.let { WorkoutEntityMapper.toWorkout(it) }
+    }
+
+    /**
+     * Mark a workout as completed in local storage (AMA-320)
+     */
+    suspend fun markWorkoutCompleted(workoutId: String) {
+        Log.d(REPO_TAG, "Marking workout $workoutId as completed")
+        pushedWorkoutDao.markCompleted(workoutId)
+    }
+
     fun getWorkout(id: String): Flow<Result<Workout>> = flow {
-        // First check the cache for the workout
+        // First check the in-memory cache for the workout
         val cachedWorkout = workoutCache[id]
         if (cachedWorkout != null) {
             emit(Result.Success(cachedWorkout))
             return@flow
         }
 
-        // Workout not in cache, try fetching from API
+        // AMA-320: Check local Room storage
+        val localWorkout = pushedWorkoutDao.getById(id)
+        if (localWorkout != null) {
+            val workout = WorkoutEntityMapper.toWorkout(localWorkout)
+            workoutCache[id] = workout // Also add to memory cache
+            emit(Result.Success(workout))
+            return@flow
+        }
+
+        // Workout not in cache or local storage, try fetching from API
         emit(Result.Loading)
         try {
             val response = api.getWorkout(id)
@@ -185,7 +250,8 @@ class WorkoutRepository @Inject constructor(
 
     /**
      * Confirm successful workout sync to backend (AMA-307)
-     * Called after successfully saving a pushed workout to the device
+     * Called after successfully saving a pushed workout to the device.
+     * Also marks the workout as synced in local Room storage (AMA-320).
      */
     suspend fun confirmSync(workoutId: String): Result<Unit> {
         DebugLog.info("Confirming sync for workout: $workoutId", TAG)
@@ -193,6 +259,10 @@ class WorkoutRepository @Inject constructor(
             val request = ConfirmSyncRequest(workoutId = workoutId)
             val response = api.confirmSync(request)
             if (response.isSuccessful) {
+                // AMA-320: Mark workout as synced in local storage
+                pushedWorkoutDao.markSynced(workoutId)
+                Log.d(REPO_TAG, "Marked workout $workoutId as synced in local storage")
+
                 DebugLog.success("Sync confirmed for workout: $workoutId", TAG)
                 Result.Success(Unit)
             } else {

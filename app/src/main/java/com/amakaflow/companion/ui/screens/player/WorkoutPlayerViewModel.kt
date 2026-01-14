@@ -636,6 +636,9 @@ class WorkoutPlayerViewModel @Inject constructor(
                 when (result) {
                     is Result.Success -> {
                         DebugLog.success("Workout completion posted: ${result.data.id}", TAG)
+                        // AMA-320: Mark workout as completed in local storage
+                        workoutRepository.markWorkoutCompleted(workoutId)
+                        DebugLog.info("AMA-320: Marked workout as completed in local storage", TAG)
                     }
                     is Result.Error -> {
                         DebugLog.error("Failed to post completion: ${result.message}", TAG)

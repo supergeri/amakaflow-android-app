@@ -136,22 +136,33 @@ class SettingsViewModel @Inject constructor(
                         }
                     }
                     is Result.Success -> {
-                        Log.d(TAG, "checkPendingWorkouts: Success! Found ${result.data.size} workouts")
-                        result.data.forEach { workout ->
+                        Log.d(TAG, "checkPendingWorkouts: Success! Found ${result.data.size} workouts from API")
+
+                        // AMA-320: If API returns empty, fall back to local storage
+                        val workoutsToShow = if (result.data.isEmpty()) {
+                            Log.d(TAG, "checkPendingWorkouts: API returned empty, checking local storage")
+                            val localWorkouts = workoutRepository.getLocalPushedWorkoutsSync()
+                            Log.d(TAG, "checkPendingWorkouts: Found ${localWorkouts.size} local workouts")
+                            localWorkouts
+                        } else {
+                            result.data
+                        }
+
+                        workoutsToShow.forEach { workout ->
                             Log.d(TAG, "  - ${workout.name} (${workout.id})")
                         }
                         _uiState.update {
                             it.copy(
                                 pendingWorkouts = PendingWorkoutsState(
                                     isLoading = false,
-                                    workouts = result.data,
+                                    workouts = workoutsToShow,
                                     isSynced = true,
                                     error = null
                                 )
                             )
                         }
 
-                        // AMA-307: Confirm sync for each successfully fetched workout
+                        // AMA-307: Confirm sync for each successfully fetched workout (only new ones from API)
                         result.data.forEach { workout ->
                             try {
                                 workoutRepository.confirmSync(workout.id)
@@ -163,13 +174,16 @@ class SettingsViewModel @Inject constructor(
                     }
                     is Result.Error -> {
                         Log.e(TAG, "checkPendingWorkouts: Error - ${result.message}")
+                        // AMA-320: On error, try to show local workouts
+                        val localWorkouts = workoutRepository.getLocalPushedWorkoutsSync()
+                        Log.d(TAG, "checkPendingWorkouts: Error occurred, falling back to ${localWorkouts.size} local workouts")
                         _uiState.update {
                             it.copy(
                                 pendingWorkouts = PendingWorkoutsState(
                                     isLoading = false,
-                                    workouts = emptyList(),
-                                    isSynced = false,
-                                    error = result.message
+                                    workouts = localWorkouts,
+                                    isSynced = localWorkouts.isNotEmpty(),
+                                    error = if (localWorkouts.isEmpty()) result.message else null
                                 )
                             )
                         }
