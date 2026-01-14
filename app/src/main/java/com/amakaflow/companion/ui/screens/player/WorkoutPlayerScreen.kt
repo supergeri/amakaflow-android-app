@@ -4,7 +4,9 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -242,13 +244,19 @@ private fun CurrentStepView(
 ) {
     if (step == null) return
 
-    Column(
+    // AMA-291: Use Box with centered content that can scroll if needed
+    // This ensures action buttons (SKIP/LOG SET) are visible on smaller screens
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(AmakaSpacing.lg.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        contentAlignment = Alignment.Center
     ) {
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         // Step counter
         Text(
             text = "Step $stepIndex of $totalSteps",
@@ -357,6 +365,7 @@ private fun CurrentStepView(
                 Spacer(modifier = Modifier.height(AmakaSpacing.xl.dp))
                 ComingUpView(nextStep = next)
             }
+        }
         }
     }
 }
