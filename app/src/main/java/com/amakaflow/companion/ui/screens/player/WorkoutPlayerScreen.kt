@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.amakaflow.companion.data.model.FlattenedInterval
 import com.amakaflow.companion.data.model.StepType
 import com.amakaflow.companion.data.model.WorkoutPhase
+import com.amakaflow.companion.ui.components.SimulationBanner
 import com.amakaflow.companion.ui.components.WeightInputView
 import com.amakaflow.companion.ui.theme.AmakaColors
 import com.amakaflow.companion.ui.theme.AmakaCornerRadius
@@ -107,33 +108,49 @@ fun WorkoutPlayerScreen(
                         onClose = { viewModel.showEndConfirmation() }
                     )
 
+                    // Simulation mode banner
+                    if (uiState.isSimulationMode) {
+                        SimulationBanner(
+                            speed = uiState.simulationSpeed,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = AmakaSpacing.md.dp, vertical = AmakaSpacing.xs.dp)
+                        )
+                    }
+
                     // Content based on phase
+                    // AMA-291: Use key() to force complete recomposition when step changes
+                    // This ensures UI updates properly during rapid simulation mode transitions
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
                     ) {
                         if (uiState.isResting) {
-                            RestPeriodView(
-                                isManualRest = uiState.isManualRest,
-                                remainingTime = uiState.formattedRestTime,
-                                onSkip = { viewModel.skipRest() }
-                            )
+                            key(uiState.currentStepIndex, uiState.isManualRest) {
+                                RestPeriodView(
+                                    isManualRest = uiState.isManualRest,
+                                    remainingTime = uiState.formattedRestTime,
+                                    onSkip = { viewModel.skipRest() }
+                                )
+                            }
                         } else {
-                            CurrentStepView(
-                                step = uiState.currentStep,
-                                remainingTime = uiState.formattedRemainingTime,
-                                stepIndex = uiState.currentStepIndex + 1,
-                                totalSteps = uiState.flattenedSteps.size,
-                                nextStep = uiState.nextStep,
-                                // AMA-287: Weight input props
-                                setNumber = uiState.setNumber,
-                                totalSetsForExercise = uiState.totalSetsForExercise,
-                                suggestedWeight = uiState.suggestedWeight,
-                                weightUnit = uiState.weightUnit,
-                                onLogSet = { weight, unit -> viewModel.logSetWeight(weight, unit) },
-                                onSkipWeight = { viewModel.skipSetWeight() }
-                            )
+                            key(uiState.currentStepIndex, uiState.setNumber) {
+                                CurrentStepView(
+                                    step = uiState.currentStep,
+                                    remainingTime = uiState.formattedRemainingTime,
+                                    stepIndex = uiState.currentStepIndex + 1,
+                                    totalSteps = uiState.flattenedSteps.size,
+                                    nextStep = uiState.nextStep,
+                                    // AMA-287: Weight input props
+                                    setNumber = uiState.setNumber,
+                                    totalSetsForExercise = uiState.totalSetsForExercise,
+                                    suggestedWeight = uiState.suggestedWeight,
+                                    weightUnit = uiState.weightUnit,
+                                    onLogSet = { weight, unit -> viewModel.logSetWeight(weight, unit) },
+                                    onSkipWeight = { viewModel.skipSetWeight() }
+                                )
+                            }
                         }
                     }
 

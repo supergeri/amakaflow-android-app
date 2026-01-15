@@ -37,7 +37,10 @@ data class WorkoutPlayerUiState(
     val setNumber: Int = 1,
     val totalSetsForExercise: Int = 1,
     val suggestedWeight: Double? = null,
-    val weightUnit: String = "lbs"
+    val weightUnit: String = "lbs",
+    // Simulation mode indicator
+    val isSimulationMode: Boolean = false,
+    val simulationSpeed: Double = 1.0
 ) {
     val currentStep: FlattenedInterval?
         get() = flattenedSteps.getOrNull(currentStepIndex)
@@ -167,7 +170,7 @@ class WorkoutPlayerViewModel @Inject constructor(
         workoutStartTime = Clock.System.now()
         virtualElapsedSeconds = 0
 
-        // AMA-291: Initialize simulation state
+        // AMA-291: Initialize simulation state and start workout
         viewModelScope.launch {
             val snapshot = simulationSettings.getSnapshot()
             simulationSnapshot = snapshot
@@ -178,18 +181,20 @@ class WorkoutPlayerViewModel @Inject constructor(
                 simulatedHealthProvider = SimulatedHealthProvider(snapshot.hrProfile, clock)
                 DebugLog.info("AMA-291: Initialized SimulatedHealthProvider (speed=${snapshot.speed}x)", TAG)
             }
-        }
 
-        _uiState.update {
-            it.copy(
-                phase = WorkoutPhase.RUNNING,
-                currentStepIndex = 0,
-                remainingSeconds = 0,
-                elapsedSeconds = 0
-            )
-        }
+            _uiState.update {
+                it.copy(
+                    phase = WorkoutPhase.RUNNING,
+                    currentStepIndex = 0,
+                    remainingSeconds = 0,
+                    elapsedSeconds = 0,
+                    isSimulationMode = snapshot.isEnabled,
+                    simulationSpeed = snapshot.speed
+                )
+            }
 
-        setupCurrentStep()
+            setupCurrentStep()
+        }
     }
 
     fun pause() {
@@ -352,6 +357,9 @@ class WorkoutPlayerViewModel @Inject constructor(
             Triple(1, 1, null)
         }
 
+        // AMA-291: Log step info for debugging
+        DebugLog.debug("Step: ${step.stepName}, type=${step.stepType}, targetReps=${step.targetReps}, set $setNumber/$totalSets", TAG)
+
         if (step.durationSeconds != null) {
             _uiState.update {
                 it.copy(
@@ -382,6 +390,9 @@ class WorkoutPlayerViewModel @Inject constructor(
         // AMA-308: Auto-select weight in simulation mode for REPS exercises
         if (step.stepType == StepType.REPS) {
             viewModelScope.launch {
+                // AMA-291: Small delay to let Compose render the new step info first
+                delay(100)
+
                 val snapshot = simulationSettings.getSnapshot()
                 if (snapshot.isEnabled && snapshot.simulateWeight) {
                     // Create weight provider with user's configured profile
@@ -392,8 +403,10 @@ class WorkoutPlayerViewModel @Inject constructor(
                     )
 
                     // Apply realistic delay based on behavior profile, scaled by simulation speed
+                    // AMA-291: Ensure minimum visible time of 2000ms so user can see reps/set info
                     val reactionTimeMs = (snapshot.behaviorProfile.reactionTime.random() * 1000).toLong()
-                    val scaledDelayMs = (reactionTimeMs / snapshot.speed.toLong().coerceAtLeast(1)).coerceAtLeast(50)
+                    val scaledDelayMs = (reactionTimeMs / snapshot.speed.toLong().coerceAtLeast(1)).coerceAtLeast(2000)
+                    DebugLog.debug("AMA-291: UI rendered, waiting ${scaledDelayMs}ms before auto-weight for ${step.stepName} (set ${_uiState.value.setNumber}/${_uiState.value.totalSetsForExercise}, reps=${step.targetReps})", TAG)
                     delay(scaledDelayMs)
 
                     // Log the simulated weight
@@ -499,7 +512,8 @@ class WorkoutPlayerViewModel @Inject constructor(
             return
         }
 
-        _uiState.update { it.copy(remainingSeconds = it.remainingSeconds - 1) }
+        // AMA-291: Decrement remaining time by simulation speed increment
+        _uiState.update { it.copy(remainingSeconds = (it.remainingSeconds - increment).coerceAtLeast(0)) }
 
         if (_uiState.value.remainingSeconds == 0) {
             viewModelScope.launch {
@@ -520,6 +534,17 @@ class WorkoutPlayerViewModel @Inject constructor(
                 it.copy(
                     isManualRest = false,
                     restRemainingSeconds = restSeconds
+                )
+            }
+            startRestTimer()
+        } else if (simulationSnapshot?.isEnabled == true) {
+            // AMA-291: In simulation mode, convert manual rest to short timed rest (3s)
+            // This allows simulation to auto-advance without user interaction
+            DebugLog.debug("AMA-291: Simulation mode - converting manual rest to 3s timed rest", TAG)
+            _uiState.update {
+                it.copy(
+                    isManualRest = false,
+                    restRemainingSeconds = 3
                 )
             }
             startRestTimer()
@@ -546,7 +571,8 @@ class WorkoutPlayerViewModel @Inject constructor(
                 virtualElapsedSeconds += increment
                 _uiState.update {
                     it.copy(
-                        restRemainingSeconds = it.restRemainingSeconds - 1,
+                        // AMA-291: Decrement rest time by simulation speed increment
+                        restRemainingSeconds = (it.restRemainingSeconds - increment).coerceAtLeast(0),
                         elapsedSeconds = virtualElapsedSeconds
                     )
                 }
@@ -613,6 +639,19 @@ class WorkoutPlayerViewModel @Inject constructor(
                 DebugLog.info("AMA-291: Posting completion - duration=${durationSeconds}s, " +
                     "simulated=$isSimulated, healthData=${healthData != null}", TAG)
 
+                // AMA-323: Only send workout_structure if we don't have set_logs.
+                // When set_logs is present, the backend uses exercise_index to match against
+                // workout_structure indices. However, for workouts with Repeat blocks, the
+                // indices don't match (flattened steps vs original nested structure).
+                // By not sending workout_structure when we have set_logs, the backend uses
+                // its fallback logic that matches by exercise name instead of index.
+                val hasSetLogs = setLogsForSubmission.isNotEmpty()
+                val workoutStructureForSubmission = if (hasSetLogs) {
+                    null
+                } else {
+                    intervals?.map { it.toSubmissionInterval() }
+                }
+
                 val submission = WorkoutCompletionSubmission(
                     workoutId = workoutId,
                     workoutName = workoutName ?: "Workout",
@@ -628,7 +667,7 @@ class WorkoutPlayerViewModel @Inject constructor(
                         distanceMeters = null,
                         steps = healthData?.steps
                     ),
-                    workoutStructure = intervals?.map { it.toSubmissionInterval() },
+                    workoutStructure = workoutStructureForSubmission,
                     isSimulated = isSimulated,
                     setLogs = setLogsForSubmission.ifEmpty { null }
                 )

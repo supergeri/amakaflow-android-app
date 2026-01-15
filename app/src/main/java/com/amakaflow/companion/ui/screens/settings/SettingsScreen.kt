@@ -72,6 +72,18 @@ fun SettingsScreen(
     var countdownBeepsEnabled by remember { mutableStateOf(true) }
     var hapticFeedbackEnabled by remember { mutableStateOf(true) }
 
+    // Use provided simulationSettings if available, otherwise get from viewModel
+    val effectiveSimulationSettings = simulationSettings ?: viewModel.simulationSettings
+
+    // Show debug settings as fullscreen overlay
+    if (showDebugSettings) {
+        DebugSettingsScreen(
+            settings = effectiveSimulationSettings,
+            onBack = { showDebugSettings = false }
+        )
+        return
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -81,19 +93,35 @@ fun SettingsScreen(
     ) {
         item {
             Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = AmakaColors.textPrimary,
-                modifier = Modifier.clickable {
-                    tapCount++
-                    if (tapCount >= 7) {
-                        showDebugSettings = true
-                        tapCount = 0
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = AmakaColors.textPrimary,
+                    modifier = Modifier.clickable {
+                        tapCount++
+                        DebugLog.info("Settings tap: $tapCount/7", "SettingsScreen")
+                        if (tapCount >= 7) {
+                            DebugLog.info("Opening debug settings!", "SettingsScreen")
+                            showDebugSettings = true
+                            tapCount = 0
+                        }
                     }
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                // Show tap progress hint after 3 taps (like iOS)
+                if (tapCount >= 3 && tapCount < 7) {
+                    Text(
+                        text = "${7 - tapCount} more...",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AmakaColors.textTertiary.copy(alpha = 0.5f)
+                    )
                 }
-            )
+            }
             Spacer(modifier = Modifier.height(AmakaSpacing.lg.dp))
         }
 
@@ -402,13 +430,6 @@ fun SettingsScreen(
         )
     }
 
-    // Debug settings fullscreen dialog
-    if (showDebugSettings && simulationSettings != null) {
-        DebugSettingsScreen(
-            settings = simulationSettings,
-            onBack = { showDebugSettings = false }
-        )
-    }
 }
 
 @Composable

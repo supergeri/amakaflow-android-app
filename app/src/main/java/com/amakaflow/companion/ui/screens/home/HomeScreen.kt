@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,6 +46,10 @@ fun HomeScreen(
     val today = LocalDate.now()
     var showQuickStartSheet by remember { mutableStateOf(false) }
 
+    // Simulation mode state (AMA-271)
+    val isSimulationEnabled by viewModel.simulationSettings.isEnabled.collectAsState(initial = false)
+    val simulationSpeed by viewModel.simulationSettings.speed.collectAsState(initial = 10.0)
+
     // Quick Start Bottom Sheet
     if (showQuickStartSheet) {
         ModalBottomSheet(
@@ -73,6 +78,15 @@ fun HomeScreen(
         item {
             Spacer(modifier = Modifier.height(AmakaSpacing.md.dp))
             DateHeader(date = today)
+        }
+
+        // Simulation mode indicator (AMA-271) - like iOS
+        if (isSimulationEnabled) {
+            item {
+                SimulationModeBanner(
+                    speed = simulationSpeed
+                )
+            }
         }
 
         // Quick action buttons (iOS style)
@@ -613,3 +627,45 @@ private val WorkoutSport.displayName: String
         WorkoutSport.CARDIO -> "Cardio"
         WorkoutSport.OTHER -> "Other"
     }
+
+/**
+ * AMA-271: Simulation mode banner for home screen.
+ * Yellow banner indicating simulation mode is active with speed multiplier.
+ */
+@Composable
+private fun SimulationModeBanner(
+    speed: Double
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFFFFD600), // Bright yellow (same as iOS)
+        shape = RoundedCornerShape(AmakaCornerRadius.md.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AmakaSpacing.md.dp, vertical = AmakaSpacing.sm.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Settings,
+                contentDescription = null,
+                tint = Color.Black,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(AmakaSpacing.sm.dp))
+            Text(
+                text = "Simulation Mode: ${speed.toInt()}x",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "Settings → Title × 7",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.Black.copy(alpha = 0.6f)
+            )
+        }
+    }
+}

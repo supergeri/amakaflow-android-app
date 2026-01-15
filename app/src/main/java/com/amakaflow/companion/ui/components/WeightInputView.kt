@@ -44,11 +44,12 @@ fun WeightInputView(
     onSkipWeight: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var weight by remember(suggestedWeight) {
+    // AMA-291: Key on exerciseName and setNumber to reset state when step changes
+    var weight by remember(exerciseName, setNumber, suggestedWeight) {
         mutableDoubleStateOf(suggestedWeight ?: 0.0)
     }
-    var isEditing by remember { mutableStateOf(false) }
-    var editText by remember { mutableStateOf("") }
+    var isEditing by remember(exerciseName, setNumber) { mutableStateOf(false) }
+    var editText by remember(exerciseName, setNumber) { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
 
     // Weight increment based on unit

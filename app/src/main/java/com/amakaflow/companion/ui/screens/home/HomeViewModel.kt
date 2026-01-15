@@ -8,6 +8,7 @@ import com.amakaflow.companion.data.model.Workout
 import com.amakaflow.companion.data.repository.PairingRepository
 import com.amakaflow.companion.data.repository.Result
 import com.amakaflow.companion.data.repository.WorkoutRepository
+import com.amakaflow.companion.simulation.SimulationSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
@@ -28,7 +29,8 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val workoutRepository: WorkoutRepository,
-    private val pairingRepository: PairingRepository
+    private val pairingRepository: PairingRepository,
+    val simulationSettings: SimulationSettings
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
