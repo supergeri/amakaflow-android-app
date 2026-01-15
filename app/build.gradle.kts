@@ -122,12 +122,23 @@ dependencies {
     implementation(libs.workmanager.hilt)
     ksp(libs.workmanager.hilt.compiler)
 
-    // Testing
+    // Testing - JVM
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
+    testImplementation(libs.mockk)
+    testImplementation(libs.truth)
+    testImplementation(libs.okhttp.mockwebserver)
+
+    // Testing - Instrumented
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.workmanager.testing)
+    androidTestImplementation(libs.hilt.android.testing)
+    androidTestImplementation(libs.mockk.android)
+    kspAndroidTest(libs.hilt.compiler)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
