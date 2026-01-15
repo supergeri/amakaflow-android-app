@@ -31,6 +31,7 @@ camerax = "1.4.1"
 zxing = "3.5.3"
 room = "2.6.1"
 workmanager = "2.9.1"
+kover = "0.8.3"
 
 [libraries]
 # Core Android
@@ -131,3 +132,4 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
