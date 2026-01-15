@@ -7,9 +7,11 @@ import com.amakaflow.companion.BuildConfig
 import com.amakaflow.companion.data.AppEnvironment
 import com.amakaflow.companion.data.TestConfig
 import com.amakaflow.companion.data.model.Workout
-import com.amakaflow.companion.data.repository.PairingRepository
-import com.amakaflow.companion.data.repository.WorkoutRepository
-import com.amakaflow.companion.data.repository.Result
+import com.amakaflow.companion.domain.Result
+import com.amakaflow.companion.domain.usecase.pairing.ClearPairingUseCase
+import com.amakaflow.companion.domain.usecase.pairing.LoadPairingStateUseCase
+import com.amakaflow.companion.domain.usecase.workout.ConfirmWorkoutSyncUseCase
+import com.amakaflow.companion.domain.usecase.workout.GetPushedWorkoutsUseCase
 import com.amakaflow.companion.simulation.SimulationSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -37,8 +39,10 @@ data class SettingsUiState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val pairingRepository: PairingRepository,
-    private val workoutRepository: WorkoutRepository,
+    private val loadPairingState: LoadPairingStateUseCase,
+    private val clearPairing: ClearPairingUseCase,
+    private val getPushedWorkouts: GetPushedWorkoutsUseCase,
+    private val confirmWorkoutSync: ConfirmWorkoutSyncUseCase,
     private val testConfig: TestConfig,
     val simulationSettings: SimulationSettings
 ) : ViewModel() {
@@ -49,7 +53,7 @@ class SettingsViewModel @Inject constructor(
     init {
         // Set initial state immediately, including test mode check
         val isTestMode = testConfig.isTestModeEnabled
-        val actuallyPaired = pairingRepository.getToken() != null
+        val actuallyPaired = loadPairingState.isPaired.value
         _uiState.update {
             it.copy(
                 environment = testConfig.appEnvironment,
@@ -66,14 +70,14 @@ class SettingsViewModel @Inject constructor(
 
     private fun observePairingState() {
         viewModelScope.launch {
-            pairingRepository.isPaired.collect { isPaired ->
+            loadPairingState.isPaired.collect { isPaired ->
                 // In test mode, always show as paired
                 val effectivelyPaired = isPaired || testConfig.isTestModeEnabled
                 _uiState.update { it.copy(isPaired = effectivelyPaired) }
             }
         }
         viewModelScope.launch {
-            pairingRepository.userProfile.collect { profile ->
+            loadPairingState.userProfile.collect { profile ->
                 // In test mode, show test email
                 val email = if (testConfig.isTestModeEnabled) {
                     testConfig.testUserEmail
@@ -104,7 +108,7 @@ class SettingsViewModel @Inject constructor(
 
     fun disableTestMode() {
         testConfig.disableTestMode()
-        val actuallyPaired = pairingRepository.getToken() != null
+        val actuallyPaired = loadPairingState.isPaired.value
         _uiState.update {
             it.copy(
                 isTestModeEnabled = false,
@@ -115,7 +119,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun unpair() {
-        pairingRepository.unpair()
+        clearPairing()
         if (testConfig.isTestModeEnabled) {
             disableTestMode()
         }
@@ -128,7 +132,7 @@ class SettingsViewModel @Inject constructor(
                 it.copy(pendingWorkouts = it.pendingWorkouts.copy(isLoading = true, error = null))
             }
 
-            workoutRepository.getPushedWorkouts().collect { result ->
+            getPushedWorkouts().collect { result ->
                 Log.d(TAG, "checkPendingWorkouts: Got result: $result")
                 when (result) {
                     is Result.Loading -> {
@@ -143,7 +147,7 @@ class SettingsViewModel @Inject constructor(
                         // AMA-320: If API returns empty, fall back to local storage
                         val workoutsToShow = if (result.data.isEmpty()) {
                             Log.d(TAG, "checkPendingWorkouts: API returned empty, checking local storage")
-                            val localWorkouts = workoutRepository.getLocalPushedWorkoutsSync()
+                            val localWorkouts = getPushedWorkouts.getLocalSync()
                             Log.d(TAG, "checkPendingWorkouts: Found ${localWorkouts.size} local workouts")
                             localWorkouts
                         } else {
@@ -167,7 +171,7 @@ class SettingsViewModel @Inject constructor(
                         // AMA-307: Confirm sync for each successfully fetched workout (only new ones from API)
                         result.data.forEach { workout ->
                             try {
-                                workoutRepository.confirmSync(workout.id)
+                                confirmWorkoutSync(workout.id)
                                 Log.d(TAG, "Confirmed sync for workout: ${workout.name}")
                             } catch (e: Exception) {
                                 Log.e(TAG, "Failed to confirm sync for ${workout.name}: ${e.message}")
@@ -177,7 +181,7 @@ class SettingsViewModel @Inject constructor(
                     is Result.Error -> {
                         Log.e(TAG, "checkPendingWorkouts: Error - ${result.message}")
                         // AMA-320: On error, try to show local workouts
-                        val localWorkouts = workoutRepository.getLocalPushedWorkoutsSync()
+                        val localWorkouts = getPushedWorkouts.getLocalSync()
                         Log.d(TAG, "checkPendingWorkouts: Error occurred, falling back to ${localWorkouts.size} local workouts")
                         _uiState.update {
                             it.copy(

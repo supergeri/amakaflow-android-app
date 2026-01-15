@@ -4,8 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amakaflow.companion.data.model.WorkoutCompletionDetail
-import com.amakaflow.companion.data.repository.Result
-import com.amakaflow.companion.data.repository.WorkoutRepository
+import com.amakaflow.companion.domain.Result
+import com.amakaflow.companion.domain.usecase.completion.GetCompletionDetailUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -19,7 +19,7 @@ data class CompletionDetailUiState(
 
 @HiltViewModel
 class CompletionDetailViewModel @Inject constructor(
-    private val workoutRepository: WorkoutRepository,
+    private val getCompletionDetail: GetCompletionDetailUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -39,7 +39,7 @@ class CompletionDetailViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            workoutRepository.getCompletionDetail(completionId).collect { result ->
+            getCompletionDetail(completionId).collect { result ->
                 when (result) {
                     is Result.Loading -> {
                         _uiState.update { it.copy(isLoading = true, error = null) }

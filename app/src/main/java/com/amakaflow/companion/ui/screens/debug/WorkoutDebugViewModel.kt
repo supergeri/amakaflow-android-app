@@ -5,8 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amakaflow.companion.data.AppEnvironment
 import com.amakaflow.companion.data.model.Workout
-import com.amakaflow.companion.data.repository.Result
-import com.amakaflow.companion.data.repository.WorkoutRepository
+import com.amakaflow.companion.domain.Result
+import com.amakaflow.companion.domain.usecase.workout.GetPushedWorkoutsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +27,7 @@ data class WorkoutDebugUiState(
 
 @HiltViewModel
 class WorkoutDebugViewModel @Inject constructor(
-    private val workoutRepository: WorkoutRepository
+    private val getPushedWorkouts: GetPushedWorkoutsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WorkoutDebugUiState(
@@ -40,7 +40,7 @@ class WorkoutDebugViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, status = "Fetching...", error = null) }
 
-            workoutRepository.getPushedWorkouts().collect { result ->
+            getPushedWorkouts().collect { result ->
                 Log.d(TAG, "fetchWorkouts: Got result: $result")
                 when (result) {
                     is Result.Loading -> {

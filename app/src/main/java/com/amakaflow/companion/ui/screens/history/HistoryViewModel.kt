@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amakaflow.companion.data.model.DateCategory
 import com.amakaflow.companion.data.model.WorkoutCompletion
-import com.amakaflow.companion.data.repository.Result
-import com.amakaflow.companion.data.repository.WorkoutRepository
+import com.amakaflow.companion.domain.Result
+import com.amakaflow.companion.domain.usecase.completion.GetCompletionHistoryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -34,7 +34,7 @@ data class HistoryUiState(
 
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
-    private val workoutRepository: WorkoutRepository
+    private val getCompletionHistory: GetCompletionHistoryUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HistoryUiState())
@@ -50,7 +50,7 @@ class HistoryViewModel @Inject constructor(
 
     private fun loadCompletions() {
         viewModelScope.launch {
-            workoutRepository.getCompletions(limit = PAGE_SIZE, offset = 0).collect { result ->
+            getCompletionHistory(limit = PAGE_SIZE, offset = 0).collect { result ->
                 when (result) {
                     is Result.Loading -> {
                         _uiState.update { it.copy(isLoading = true, error = null) }
@@ -88,7 +88,7 @@ class HistoryViewModel @Inject constructor(
             _uiState.update { it.copy(isLoadingMore = true) }
 
             val offset = currentState.completions.size
-            workoutRepository.getCompletions(limit = PAGE_SIZE, offset = offset).collect { result ->
+            getCompletionHistory(limit = PAGE_SIZE, offset = offset).collect { result ->
                 when (result) {
                     is Result.Loading -> {
                         // Already set isLoadingMore above

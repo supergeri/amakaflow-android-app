@@ -1,5 +1,6 @@
 package com.amakaflow.companion.domain.repository
 
+import com.amakaflow.companion.data.local.PendingCompletionEntity
 import com.amakaflow.companion.data.model.WorkoutCompletion
 import com.amakaflow.companion.data.model.WorkoutCompletionDetail
 import com.amakaflow.companion.data.model.WorkoutCompletionSubmission
@@ -30,8 +31,8 @@ interface CompletionRepository {
     fun getCompletionDetail(id: String): Flow<Result<WorkoutCompletionDetail>>
 
     /**
-     * Submit a workout completion immediately.
-     * Returns error if submission fails.
+     * Submit a workout completion.
+     * Attempts immediate submission; queues for later if offline or failed.
      */
     suspend fun submitCompletion(submission: WorkoutCompletionSubmission): Result<WorkoutCompletion>
 
@@ -45,4 +46,19 @@ interface CompletionRepository {
      * Get the number of pending completions in the queue.
      */
     fun getPendingCount(): Flow<Int>
+
+    /**
+     * Get all pending completions.
+     */
+    fun getPendingCompletions(): Flow<List<PendingCompletionEntity>>
+
+    /**
+     * Manually trigger sync of pending completions.
+     */
+    fun triggerSync()
+
+    /**
+     * Get count of pending completions synchronously.
+     */
+    suspend fun getPendingCountSync(): Int
 }
