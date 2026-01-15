@@ -3,10 +3,13 @@ package com.amakaflow.companion.ui.screens.workouts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amakaflow.companion.data.model.Workout
-import com.amakaflow.companion.data.repository.Result
-import com.amakaflow.companion.data.repository.WorkoutRepository
+import com.amakaflow.companion.domain.Result
+import com.amakaflow.companion.domain.usecase.workout.GetWorkoutDetailUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -18,7 +21,7 @@ data class WorkoutDetailUiState(
 
 @HiltViewModel
 class WorkoutDetailViewModel @Inject constructor(
-    private val workoutRepository: WorkoutRepository
+    private val getWorkoutDetail: GetWorkoutDetailUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WorkoutDetailUiState())
@@ -26,7 +29,7 @@ class WorkoutDetailViewModel @Inject constructor(
 
     fun loadWorkout(workoutId: String) {
         viewModelScope.launch {
-            workoutRepository.getWorkout(workoutId).collect { result ->
+            getWorkoutDetail(workoutId).collect { result ->
                 when (result) {
                     is Result.Loading -> {
                         _uiState.update { it.copy(isLoading = true, error = null) }

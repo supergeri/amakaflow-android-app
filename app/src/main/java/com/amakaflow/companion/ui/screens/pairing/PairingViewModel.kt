@@ -4,10 +4,14 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.amakaflow.companion.data.repository.PairingRepository
-import com.amakaflow.companion.data.repository.Result
+import com.amakaflow.companion.domain.Result
+import com.amakaflow.companion.domain.usecase.pairing.LoadPairingStateUseCase
+import com.amakaflow.companion.domain.usecase.pairing.PairDeviceUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -43,7 +47,8 @@ data class PairingUiState(
 
 @HiltViewModel
 class PairingViewModel @Inject constructor(
-    private val pairingRepository: PairingRepository
+    private val pairDevice: PairDeviceUseCase,
+    private val loadPairingState: LoadPairingStateUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PairingUiState())
@@ -51,7 +56,7 @@ class PairingViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            pairingRepository.isPaired.collect { isPaired ->
+            loadPairingState.isPaired.collect { isPaired ->
                 _uiState.update { it.copy(isPaired = isPaired) }
             }
         }
@@ -174,7 +179,7 @@ class PairingViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            when (val result = pairingRepository.pair(code)) {
+            when (val result = pairDevice(code)) {
                 is Result.Success -> {
                     _uiState.update { it.copy(isLoading = false, isPaired = true) }
                 }

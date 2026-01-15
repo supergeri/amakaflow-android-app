@@ -20,6 +20,21 @@ interface WorkoutRepository {
     fun getPushedWorkouts(): Flow<Result<List<Workout>>>
 
     /**
+     * Get locally stored pushed workouts from the database.
+     */
+    fun getLocalPushedWorkouts(): Flow<List<Workout>>
+
+    /**
+     * Get locally stored pushed workouts synchronously.
+     */
+    suspend fun getLocalPushedWorkoutsSync(): List<Workout>
+
+    /**
+     * Get a specific workout from local storage.
+     */
+    suspend fun getLocalWorkout(workoutId: String): Workout?
+
+    /**
      * Get a specific workout by ID.
      */
     fun getWorkout(id: String): Flow<Result<Workout>>
@@ -34,4 +49,14 @@ interface WorkoutRepository {
      * Confirm successful sync of a workout to the backend.
      */
     suspend fun confirmSync(workoutId: String): Result<Unit>
+
+    /**
+     * Report failed sync to backend.
+     */
+    suspend fun reportSyncFailed(workoutId: String, error: String): Result<Unit>
+
+    /**
+     * Mark a workout as completed in local storage.
+     */
+    suspend fun markWorkoutCompleted(workoutId: String)
 }

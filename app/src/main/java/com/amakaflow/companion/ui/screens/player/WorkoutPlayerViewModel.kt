@@ -4,8 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amakaflow.companion.data.model.*
-import com.amakaflow.companion.data.repository.Result
-import com.amakaflow.companion.data.repository.WorkoutRepository
+import com.amakaflow.companion.domain.Result
+import com.amakaflow.companion.domain.usecase.completion.SubmitCompletionUseCase
+import com.amakaflow.companion.domain.usecase.workout.GetWorkoutDetailUseCase
+import com.amakaflow.companion.domain.usecase.workout.MarkWorkoutCompletedUseCase
 import com.amakaflow.companion.debug.DebugLog
 import com.amakaflow.companion.simulation.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -98,7 +100,9 @@ data class WorkoutPlayerUiState(
 
 @HiltViewModel
 class WorkoutPlayerViewModel @Inject constructor(
-    private val workoutRepository: WorkoutRepository,
+    private val getWorkoutDetail: GetWorkoutDetailUseCase,
+    private val submitCompletion: SubmitCompletionUseCase,
+    private val markWorkoutCompleted: MarkWorkoutCompletedUseCase,
     private val simulationSettings: SimulationSettings,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -127,7 +131,7 @@ class WorkoutPlayerViewModel @Inject constructor(
     private fun loadWorkout() {
         DebugLog.info("Loading workout: $workoutId", TAG)
         viewModelScope.launch {
-            workoutRepository.getWorkout(workoutId).collect { result ->
+            getWorkoutDetail(workoutId).collect { result ->
                 when (result) {
                     is Result.Loading -> {
                         _uiState.update { it.copy(isLoading = true) }
@@ -671,12 +675,12 @@ class WorkoutPlayerViewModel @Inject constructor(
                     isSimulated = isSimulated,
                     setLogs = setLogsForSubmission.ifEmpty { null }
                 )
-                val result = workoutRepository.completeWorkout(submission)
+                val result = submitCompletion(submission)
                 when (result) {
                     is Result.Success -> {
                         DebugLog.success("Workout completion posted: ${result.data.id}", TAG)
                         // AMA-320: Mark workout as completed in local storage
-                        workoutRepository.markWorkoutCompleted(workoutId)
+                        markWorkoutCompleted(workoutId)
                         DebugLog.info("AMA-320: Marked workout as completed in local storage", TAG)
                     }
                     is Result.Error -> {

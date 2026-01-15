@@ -5,9 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amakaflow.companion.data.model.WeeklySummary
 import com.amakaflow.companion.data.model.Workout
-import com.amakaflow.companion.data.repository.PairingRepository
-import com.amakaflow.companion.data.repository.Result
-import com.amakaflow.companion.data.repository.WorkoutRepository
+import com.amakaflow.companion.domain.Result
+import com.amakaflow.companion.domain.usecase.completion.GetCompletionHistoryUseCase
+import com.amakaflow.companion.domain.usecase.pairing.LoadPairingStateUseCase
+import com.amakaflow.companion.domain.usecase.workout.GetPushedWorkoutsUseCase
 import com.amakaflow.companion.simulation.SimulationSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -28,8 +29,9 @@ data class HomeUiState(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val workoutRepository: WorkoutRepository,
-    private val pairingRepository: PairingRepository,
+    private val getPushedWorkouts: GetPushedWorkoutsUseCase,
+    private val getCompletionHistory: GetCompletionHistoryUseCase,
+    private val loadPairingState: LoadPairingStateUseCase,
     val simulationSettings: SimulationSettings
 ) : ViewModel() {
 
@@ -52,7 +54,7 @@ class HomeViewModel @Inject constructor(
     private fun observeLocalWorkouts() {
         localWorkoutsJob?.cancel()
         localWorkoutsJob = viewModelScope.launch {
-            workoutRepository.getLocalPushedWorkouts().collect { localWorkouts ->
+            getPushedWorkouts.getLocal().collect { localWorkouts ->
                 Log.d(TAG, "observeLocalWorkouts: ${localWorkouts.size} local workouts available")
                 // Only update if we currently have no workouts (API returned empty)
                 if (_uiState.value.todayWorkouts.isEmpty() && localWorkouts.isNotEmpty()) {
@@ -70,7 +72,7 @@ class HomeViewModel @Inject constructor(
 
     private fun observeUserProfile() {
         viewModelScope.launch {
-            pairingRepository.userProfile.collect { profile ->
+            loadPairingState.userProfile.collect { profile ->
                 _uiState.update { it.copy(userName = profile?.name) }
             }
         }
@@ -80,7 +82,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             Log.d(TAG, "loadData: Starting to fetch pushed workouts")
             // Load pushed workouts from android-companion endpoint
-            workoutRepository.getPushedWorkouts().collect { result ->
+            getPushedWorkouts().collect { result ->
                 Log.d(TAG, "loadData: Got result: $result")
                 when (result) {
                     is Result.Loading -> {
@@ -94,7 +96,7 @@ class HomeViewModel @Inject constructor(
                         // fall back to local storage
                         val workoutsToShow = if (result.data.isEmpty()) {
                             Log.d(TAG, "loadData: API returned empty, checking local storage")
-                            val localWorkouts = workoutRepository.getLocalPushedWorkoutsSync()
+                            val localWorkouts = getPushedWorkouts.getLocalSync()
                             Log.d(TAG, "loadData: Found ${localWorkouts.size} local workouts")
                             localWorkouts
                         } else {
@@ -114,7 +116,7 @@ class HomeViewModel @Inject constructor(
                     is Result.Error -> {
                         Log.e(TAG, "loadData: Error - ${result.message}")
                         // AMA-320: On error, try to show local workouts
-                        val localWorkouts = workoutRepository.getLocalPushedWorkoutsSync()
+                        val localWorkouts = getPushedWorkouts.getLocalSync()
                         Log.d(TAG, "loadData: Error occurred, falling back to ${localWorkouts.size} local workouts")
                         _uiState.update {
                             it.copy(
@@ -132,7 +134,7 @@ class HomeViewModel @Inject constructor(
 
     private fun loadWeeklyStats() {
         viewModelScope.launch {
-            workoutRepository.getCompletions(limit = 50, offset = 0).collect { result ->
+            getCompletionHistory(limit = 50, offset = 0).collect { result ->
                 when (result) {
                     is Result.Success -> {
                         val weeklyStats = WeeklySummary.fromCompletions(result.data.completions)
