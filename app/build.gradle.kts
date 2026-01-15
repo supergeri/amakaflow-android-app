@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.kover)
 }
 
 android {
@@ -61,6 +62,39 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+    }
+}
+
+kover {
+    reports {
+        filters {
+            excludes {
+                // Exclude generated code
+                classes(
+                    "*_Factory",
+                    "*_Factory\$*",
+                    "*_HiltModules*",
+                    "*Hilt_*",
+                    "*_Impl",
+                    "*_Impl\$*",
+                    "*.BuildConfig",
+                    "*_MembersInjector",
+                    "*Module_*",
+                    "*Dagger*",
+                    "*_GeneratedInjector"
+                )
+                // Exclude DI module
+                packages(
+                    "*.di",
+                    "dagger.hilt.*",
+                    "hilt_aggregated_deps"
+                )
+            }
+        }
+
+        // Note: Coverage verification is disabled for now
+        // The reports show ~2% coverage which is expected for the current test suite
+        // Verification can be enabled once coverage reaches a meaningful threshold
     }
 }
 
