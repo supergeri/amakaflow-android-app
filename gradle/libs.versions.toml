@@ -5,6 +5,10 @@ coreKtx = "1.15.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
+# Testing
+turbine = "1.0.0"
+mockk = "1.13.8"
+truth = "1.4.2"
 lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.9.3"
 composeBom = "2024.12.01"
@@ -97,6 +101,28 @@ workmanager-hilt-compiler = { group = "androidx.hilt", name = "hilt-compiler", v
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+
+# Coroutines testing
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+
+# Flow testing (essential!)
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+
+# Mocking
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+mockk-android = { group = "io.mockk", name = "mockk-android", version.ref = "mockk" }
+
+# Assertions
+truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
+
+# HTTP mocking
+okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
+
+# WorkManager testing
+workmanager-testing = { group = "androidx.work", name = "work-testing", version.ref = "workmanager" }
+
+# Hilt testing
+hilt-android-testing = { group = "com.google.dagger", name = "hilt-android-testing", version.ref = "hilt" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
